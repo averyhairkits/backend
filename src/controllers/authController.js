@@ -3,20 +3,24 @@ const supabase = require('../config/supabase');
 const authController = {
   async signup(req, res) {
     try {
-      const { email, password, username, firstname, lastname } = req.body;
+      const { email, password, firstname, lastname } = req.body;
 
-      if (!email || !password || !username) {
+      if (!email || !password || !firstname || !lastname) {
+        console.log("debugger 1.0");
         return res.status(400).json({
-          error: 'Email, password, and username are required',
+          error: 'Email, password, first name, and last name are required',
         });
       }
 
       const { error: authError } = await supabase.auth.signUp({
         email,
         password,
+        firstname,
+        lastname
       });
 
       if (authError) {
+        console.log("debugger 1.1");
         return res.status(400).json({ error: authError.message });
       }
 
@@ -24,16 +28,17 @@ const authController = {
         .from('users')
         .insert([
           {
-            username,
             email,
-            firstname: firstname || null,
-            lastname: lastname || null,
+            password,
+            firstname,
+            lastname,
           },
         ])
         .select()
         .single();
 
       if (userError) {
+        console.log("debugger 1.2");
         return res.status(400).json({ error: userError.message });
       }
 
@@ -43,19 +48,30 @@ const authController = {
       });
       // eslint-disable-next-line no-unused-vars
     } catch (error) {
+      console.log("debugger 1.3:");
+      console.log(`${error}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   },
 
   async login(req, res) {
     try {
-      const { email, password } = req.body;
+      const { email, password, confirm_password } = req.body;
 
-      if (!email || !password) {
+      if (!email || !password || !confirm_password) {
         return res.status(400).json({
           error: 'Email and password are required',
         });
       }
+      
+      if (password !== confirm_password)
+      {
+        console.log(`login controller 1.0: ${error}`);
+        return res.status(400).json({
+          error: 'password and confirm password must match',
+        });
+      }
+
       console.log('Got email and passwordHash', email, password);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -63,6 +79,7 @@ const authController = {
       });
 
       if (error) {
+        console.log(`login controller 1.1: ${error}`);
         return res.status(401).json({
           error: 'Invalid credentials',
         });
@@ -81,6 +98,7 @@ const authController = {
         token: data.session.access_token,
       });
     } catch (error) {
+      console.log(`catch login controller 1.2: ${error}`)
       console.error('Login error:', error);
       res.status(500).json({ error: 'Authentication failed' });
     }
