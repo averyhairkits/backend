@@ -6,7 +6,7 @@ const authController = {
       const { email, password, firstname, lastname } = req.body;
 
       if (!email || !password || !firstname || !lastname) {
-        console.log("debugger 1.0");
+        console.log('debugger 1.0');
         return res.status(400).json({
           error: 'Email, password, first name, and last name are required',
         });
@@ -20,7 +20,7 @@ const authController = {
       });
 
       if (authError) {
-        console.log("debugger 1.1");
+        console.log('debugger 1.1');
         return res.status(400).json({ error: authError.message });
       }
 
@@ -38,7 +38,7 @@ const authController = {
         .single();
 
       if (userError) {
-        console.log("debugger 1.2");
+        console.log('debugger 1.2');
         return res.status(400).json({ error: userError.message });
       }
 
@@ -48,7 +48,7 @@ const authController = {
       });
       // eslint-disable-next-line no-unused-vars
     } catch (error) {
-      console.log("debugger 1.3:");
+      console.log('debugger 1.3:');
       console.log(`${error}`);
       res.status(500).json({ error: 'Internal server error' });
     }
