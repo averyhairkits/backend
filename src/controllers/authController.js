@@ -16,7 +16,7 @@ const authController = {
         email,
         password,
         firstname,
-        lastname
+        lastname,
       });
 
       if (authError) {
@@ -63,9 +63,8 @@ const authController = {
           error: 'Email and password are required',
         });
       }
-      
-      if (password !== confirm_password)
-      {
+
+      if (password !== confirm_password) {
         console.log(`login controller 1.0: ${error}`);
         return res.status(400).json({
           error: 'password and confirm password must match',
@@ -98,7 +97,7 @@ const authController = {
         token: data.session.access_token,
       });
     } catch (error) {
-      console.log(`catch login controller 1.2: ${error}`)
+      console.log(`catch login controller 1.2: ${error}`);
       console.error('Login error:', error);
       res.status(500).json({ error: 'Authentication failed' });
     }
