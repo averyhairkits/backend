@@ -46,7 +46,8 @@ app.use((req, res, next) => {
 app.use('/auth', authRoutes);
 
 // handel date processing
-app.use('/api', authRoutes);
+console.log("debugger 1.0")
+app.use('/api', apiRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });

@@ -3,9 +3,9 @@ const supabase = require('../config/supabase');
 const newRequestController = async (req, res) => {
   const { reqTimeStampList, request_size } = req.body;
   // get the user who made this request
-  const user = supabase.auth.user()
+  // const user = supabase.auth.user()
   for (let i = 0; i < reqTimeStampList.length; i++){
-    helper(reqTimeStampList[i], request_size);
+    helper(reqTimeStampList[i], request_size, res);
   }
 }
 
@@ -14,15 +14,18 @@ const approveRequestController = async (req, res) => {
   
 }
 
-const helper = async (reqTimeStamp, request_size) => {
+const helper = async (reqTimeStamp, request_size, res) => {
+  const now = new Date();
   // what day is it today
   const dayOfWeek = now.getDay();
   // date of this week's Sunday
   const diffToSunday = dayOfWeek === 0 ? 0 : -1 * dayOfWeek;
+  //this week start date
   const thisWeekSunday = new Date(now);
   thisWeekSunday.setDate(dayOfWeek + diffToSunday)
 
-  if ((reqTimeStamp - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21){
+  const requestedDate = new Date(reqTimeStamp);
+  if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21){
     // requested time more than three weeks from this week's sunday
     return res.status(400).json({
       error: 'cannot register for time slots three weeks from this week'
@@ -35,7 +38,7 @@ const helper = async (reqTimeStamp, request_size) => {
     .select('*')
     .eq('slot_time', reqTimeStamp);
 
-  if (error){
+  if (searchError){
     return res.status(400).json({
       error: searchError
     })
@@ -45,8 +48,9 @@ const helper = async (reqTimeStamp, request_size) => {
     // no such slots for now
     // other people haven't requested to volunteer at this time yet
     const newRequest = {
-      created_at: Date.now(),
-      slot_time: reqTimeStamp,
+      created_at: new Date().toISOString(),
+      slot_time: new Date(reqTimeStamp).toISOString(),
+      week_start_date: thisWeekSunday.toISOString(),
       current_size: request_size,
       status: "waiting"
     };
@@ -58,7 +62,8 @@ const helper = async (reqTimeStamp, request_size) => {
       // handle error with supabase creating new row
       console.error('Error creating new_request; error inserting row:', createRequestError);
       return res.status(400).json({ 
-        error: `Error creating new_request; error inserting row: ${createRequestError}`
+        error: `Error creating new_request; error inserting row: ${createRequestError.message}`,
+        errorDetail: `${createRequestError.details}`
       });
     }
     
