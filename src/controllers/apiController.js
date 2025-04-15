@@ -9,10 +9,10 @@ const newRequestController = async (req, res) => {
   }
 }
 
-const approveRequestController = async (req, res) => {
-  const { reqTimeStamp } = req.body;
+// const approveRequestController = async (req, res) => {
+//   const { reqTimeStamp } = req.body;
   
-}
+// }
 
 const helper = async (reqTimeStamp, request_size, res) => {
   const now = new Date();
