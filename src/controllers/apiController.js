@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 
+//handles a new volunteer making an availability submission
 const newRequestController = async (req, res) => {
   const { reqTimeStampList, request_size } = req.body;
   // get the user who made this request
@@ -9,11 +10,14 @@ const newRequestController = async (req, res) => {
   //     error: "only volunteer can request to volunteer"
   //   })
   // }
+
+  //iterate through each time slot, calling helper on each
   for (let i = 0; i < reqTimeStampList.length; i++){
     newRequestHelper(reqTimeStampList[i], request_size, res);
   }
 }
 
+//handles when an admin approves a list of pending time slots
 const approveRequestController = async (req, res) => {
   const { reqTimeStampList } = req.body;
 
@@ -22,6 +26,7 @@ const approveRequestController = async (req, res) => {
   }
 }
 
+//handles when an admin rejects a list of pending time slots
 const rejectRequestController = async (req, res) => {
   const { reqTimeStampList } = req.body;
   // update the status field
@@ -31,17 +36,19 @@ const rejectRequestController = async (req, res) => {
   }
 }
 
+//helper for processing new time slot submission from volunteer
 const newRequestHelper = async (reqTimeStamp, request_size, res) => {
-  const now = new Date();
-  // what day is it today
-  const dayOfWeek = now.getDay();
-  // date of this week's Sunday
-  const diffToSunday = dayOfWeek === 0 ? 0 : -1 * dayOfWeek;
-  //this week start date
+
+  //calculate start of this week
+  const now = new Date(); // what day is it today
+  const dayOfWeek = now.getDay(); // date of this week's Sunday
+  const diffToSunday = dayOfWeek === 0 ? 0 : -1 * dayOfWeek; //this week start date
   const thisWeekSunday = new Date(now);
   thisWeekSunday.setDate(dayOfWeek + diffToSunday)
 
+
   const requestedDate = new Date(reqTimeStamp);
+
   if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21){
     // requested time more than three weeks from this week's sunday
     return res.status(400).json({
@@ -49,7 +56,7 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
     });
   }
 
-  // search to see wether this time slot exists or not
+  // search to see whether this time slot exists or not
   const { data, searchError } = await supabase
     .from('slots')
     .select('*')
@@ -71,6 +78,8 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
       current_size: request_size,
       status: "waiting"
     };
+
+    //insert into slots db
     const { data: slotReturnInfo, error: createRequestError } = await supabase
         .from('slots')
         .insert([newRequest])
@@ -117,8 +126,10 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
   });
 }
 
+//handles approving a time slot - admin only
 const approveRequestHelper = async (reqTimeStamp, req, res) => {
   
+  //retrieve token from cookie or auth header
   const token =
     req.cookies.session || req.headers.authorization?.split(' ')[1];
 
@@ -167,6 +178,7 @@ const approveRequestHelper = async (reqTimeStamp, req, res) => {
   })
 }
 
+//helper to reject a time slot - admin only
 const rejectRequestHelper = async (reqTimeStamp, req, res) => {
 
   const token =
