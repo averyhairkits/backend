@@ -15,8 +15,12 @@ const authController = {
       const { error: authError } = await supabase.auth.signUp({
         email,
         password,
-        firstname,
-        lastname,
+        options: {
+          data: {
+            firstname,
+            lastname,
+          },
+        },
       });
 
       if (authError) {
@@ -29,9 +33,9 @@ const authController = {
         .insert([
           {
             email,
-            password,
             firstname,
             lastname,
+            password,
           },
         ])
         .select()
@@ -56,18 +60,12 @@ const authController = {
 
   async login(req, res) {
     try {
-      const { email, password, confirm_password } = req.body;
+      const { email, password} = req.body;
 
-      if (!email || !password || !confirm_password) {
+      if (!email || !password) {
+        console.log('login controller 0.1: missing email or password');
         return res.status(400).json({
           error: 'Email and password are required',
-        });
-      }
-
-      if (password !== confirm_password) {
-        console.log(`login controller 1.0: ${error}`);
-        return res.status(400).json({
-          error: 'password and confirm password must match',
         });
       }
 
