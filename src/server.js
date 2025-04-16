@@ -4,6 +4,7 @@ const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
+const apiRoutes = require('./routes/apiRoutes');
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/auth', authRoutes);
+app.use('/api', apiRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
