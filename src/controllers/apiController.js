@@ -15,6 +15,9 @@ const newRequestController = async (req, res) => {
 
   //iterate through each time slot, calling helper on each
   for (let i = 0; i < reqTimeStampList.length; i++) {
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     newRequestHelper(reqTimeStampList[i], request_size, res);
   }
@@ -39,6 +42,7 @@ const rejectRequestController = async (req, res) => {
 
 const newRequestHelper = async (reqTimeStamp, request_size, res) => {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   const now = new Date();
   // what day is it today
   const dayOfWeek = now.getDay();
@@ -51,6 +55,8 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
   const requestedDate = new Date(reqTimeStamp);
   if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21){
 =======
+=======
+>>>>>>> Stashed changes
   //calculate start of this week
   const now = new Date(); // what day is it today
   const dayOfWeek = now.getDay(); // date of this week's Sunday
@@ -61,6 +67,9 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
   const requestedDate = new Date(reqTimeStamp);
 
   if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21) {
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     // requested time more than three weeks from this week's sunday
     return res.status(400).json({
@@ -141,9 +150,14 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
 
 const approveRequestHelper = async (reqTimeStamp, req, res) => {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   
   const token =
     req.cookies.session || req.headers.authorization?.split(' ')[1];
+=======
+  //retrieve token from cookie or auth header
+  const token = req.cookies.session || req.headers.authorization?.split(' ')[1];
+>>>>>>> Stashed changes
 =======
   //retrieve token from cookie or auth header
   const token = req.cookies.session || req.headers.authorization?.split(' ')[1];
