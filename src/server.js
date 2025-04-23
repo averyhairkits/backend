@@ -44,6 +44,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/auth', authRoutes);
+app.use('/api', apiRoutes);
 
 // handel date processing
 console.log("debugger 1.0")

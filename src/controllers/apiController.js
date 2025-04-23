@@ -87,4 +87,119 @@ const helper = async (reqTimeStamp, request_size) => {
   }
 };
 
-module.exports = { newRequestController };
+const approveRequestController = async (req, res) => {
+  const { reqTimeStampList } = req.body;
+
+  for (let i = 0; i < reqTimeStampList.length; i++){
+    approveRequestHelper(reqTimeStampList[i], req, res);
+  }
+}
+
+const rejectRequestController = async (req, res) => {
+  const { reqTimeStampList } = req.body;
+  // update the status field
+
+  for (let i = 0; i < reqTimeStampList.length; i++){
+    rejectRequestHelper(reqTimeStampList[i], req, res);
+  }
+}
+
+const approveRequestHelper = async (reqTimeStamp, req, res) => {
+  
+  const token =
+    req.cookies.session || req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  // get the user who made this request
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token);
+
+  if (userError || !user) {
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+
+  const { data: userData, error: dbError } = await supabase
+  .from('users')
+  .select('role')
+  .eq('email', user.email)
+  .single();
+
+  if (dbError || !userData || userData.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Only logged-in admins can approve a time slot',
+    });
+  }
+
+  // update the status field
+  const { approveStatusReturnData, updateStatusError } = await supabase
+    .from('slots')
+    .update({ status: "approved" })
+    .match({ slot_time: reqTimeStamp })
+  
+  // handle potential error with approving time slot status
+  if (updateStatusError) {
+    return res.status(400).json({
+      error: updateStatusError
+    })
+  }
+  // successfully approved a time slot
+  return res.status(200).json({
+    message: `successfully updated time slot (${reqTimeStamp}) status from waiting to approved`,
+    return_data: approveStatusReturnData
+  })
+}
+
+const rejectRequestHelper = async (reqTimeStamp, req, res) => {
+
+  const token =
+    req.cookies.session || req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
+  // get the user who made this request
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token);
+
+  if (userError || !user) {
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+
+  const { data: userData, error: dbError } = await supabase
+  .from('users')
+  .select('role')
+  .eq('email', user.email)
+  .single();
+
+  if (dbError || !userData || userData.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Only logged-in admins can reject a time slot',
+    });
+  }
+
+  const { rejectStatusReturnData, rejectStatusError } = await supabase
+    .from('slots')
+    .update({ status: "rejected" })
+    .match({ slot_time: reqTimeStamp })
+  // handle potential error with approving time slot status
+  if (rejectStatusError) {
+    return res.status(400).json({
+      error: rejectStatusError
+    })
+  }
+  // updated status from waiting to rejected
+  return res.status(200).json({
+    message: `successfully updated time slot (${reqTimeStamp}) status from waiting to rejected`,
+    return_data: rejectStatusReturnData
+  })
+}
+
+module.exports = { newRequestController, approveRequestController, rejectRequestController }
