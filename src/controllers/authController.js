@@ -50,7 +50,6 @@ const authController = {
         message: 'User created successfully',
         user: userData,
       });
-      // eslint-disable-next-line no-unused-vars
     } catch (error) {
       console.log('debugger 1.3:');
       console.log(`${error}`);
@@ -60,7 +59,7 @@ const authController = {
 
   async login(req, res) {
     try {
-      const { email, password} = req.body;
+      const { email, password } = req.body;
 
       if (!email || !password) {
         console.log('login controller 0.1: missing email or password');

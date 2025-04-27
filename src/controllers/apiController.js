@@ -12,47 +12,45 @@ const newRequestController = async (req, res) => {
   // }
 
   //iterate through each time slot, calling helper on each
-  for (let i = 0; i < reqTimeStampList.length; i++){
+  for (let i = 0; i < reqTimeStampList.length; i++) {
     newRequestHelper(reqTimeStampList[i], request_size, res);
   }
-}
+};
 
 //handles when an admin approves a list of pending time slots
 const approveRequestController = async (req, res) => {
   const { reqTimeStampList } = req.body;
 
-  for (let i = 0; i < reqTimeStampList.length; i++){
+  for (let i = 0; i < reqTimeStampList.length; i++) {
     approveRequestHelper(reqTimeStampList[i], req, res);
   }
-}
+};
 
 //handles when an admin rejects a list of pending time slots
 const rejectRequestController = async (req, res) => {
   const { reqTimeStampList } = req.body;
   // update the status field
 
-  for (let i = 0; i < reqTimeStampList.length; i++){
+  for (let i = 0; i < reqTimeStampList.length; i++) {
     rejectRequestHelper(reqTimeStampList[i], req, res);
   }
-}
+};
 
 //helper for processing new time slot submission from volunteer
 const newRequestHelper = async (reqTimeStamp, request_size, res) => {
-
   //calculate start of this week
   const now = new Date(); // what day is it today
   const dayOfWeek = now.getDay(); // date of this week's Sunday
   const diffToSunday = dayOfWeek === 0 ? 0 : -1 * dayOfWeek; //this week start date
   const thisWeekSunday = new Date(now);
-  thisWeekSunday.setDate(dayOfWeek + diffToSunday)
-
+  thisWeekSunday.setDate(dayOfWeek + diffToSunday);
 
   const requestedDate = new Date(reqTimeStamp);
 
-  if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21){
+  if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21) {
     // requested time more than three weeks from this week's sunday
     return res.status(400).json({
-      error: 'cannot register for time slots three weeks from this week'
+      error: 'cannot register for time slots three weeks from this week',
     });
   }
 
@@ -62,13 +60,13 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
     .select('*')
     .eq('slot_time', reqTimeStamp);
 
-  if (searchError){
+  if (searchError) {
     return res.status(400).json({
-      error: searchError
-    })
+      error: searchError,
+    });
   }
 
-  if (data.length === 0){ 
+  if (data.length === 0) {
     // no such slots for now
     // other people haven't requested to volunteer at this time yet
     const newRequest = {
@@ -76,62 +74,72 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
       slot_time: new Date(reqTimeStamp).toISOString(),
       week_start_date: thisWeekSunday.toISOString(),
       current_size: request_size,
-      status: "waiting"
+      status: 'waiting',
     };
 
     //insert into slots db
     const { data: slotReturnInfo, error: createRequestError } = await supabase
-        .from('slots')
-        .insert([newRequest])
+      .from('slots')
+      .insert([newRequest]);
 
     if (createRequestError) {
       // handle error with supabase creating new row
-      console.error('Error creating new_request; error inserting row:', createRequestError);
-      return res.status(400).json({ 
+      console.error(
+        'Error creating new_request; error inserting row:',
+        createRequestError
+      );
+      return res.status(400).json({
         error: `Error creating new_request; error inserting row: ${createRequestError.message}`,
-        errorDetail: `${createRequestError.details}`
+        errorDetail: `${createRequestError.details}`,
       });
     }
-    
+
     return res.status(201).json({
       message: 'request created successfully, wait to be approved',
       slot_info: slotReturnInfo,
     });
   }
-  
+
   // slots exists
-  if ( (request_size + data.current_size) > 6 ) {
+  if (request_size + data.current_size > 6) {
     // request_size is too large
     return res.status(400).json({
-      error: `request size plus current exceeds 6, current size is ${data.current_size}`
-    })
+      error: `request size plus current exceeds 6, current size is ${data.current_size}`,
+    });
   }
 
-  if (data.status === "rejected") {
+  if (data.status === 'rejected') {
     // cannot request to volunteer on time slots already rejected by Petina
     return res.status(400).json({
-      error: `Time slots ${reqTimeStamp} is unavailable. Please choose another time slot`
-    })
+      error: `Time slots ${reqTimeStamp} is unavailable. Please choose another time slot`,
+    });
   }
 
   // already has this slot, we update existing row instead of insert new row
   const { updateReturnData, error } = await supabase
     .from('slots')
     .update({ current_size: request_size + data.current_size })
-    .match({ slot_time: reqTimeStamp })
+    .match({ slot_time: reqTimeStamp });
+
+  if (error) {
+    // handle error with supabase creating new row
+    console.error('Error creating new_request; error inserting row:', error);
+    return res.status(400).json({
+      error: `Error creating new_request; error inserting row: ${error.message}`,
+      errorDetail: `${error.details}`,
+    });
+  }
 
   return res.status(201).json({
     message: 'request created successfully, wait to be approved',
     slot_info: updateReturnData,
   });
-}
+};
 
 //handles approving a time slot - admin only
 const approveRequestHelper = async (reqTimeStamp, req, res) => {
-  
   //retrieve token from cookie or auth header
-  const token =
-    req.cookies.session || req.headers.authorization?.split(' ')[1];
+  const token = req.cookies.session || req.headers.authorization?.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Not authenticated' });
@@ -148,10 +156,10 @@ const approveRequestHelper = async (reqTimeStamp, req, res) => {
   }
 
   const { data: userData, error: dbError } = await supabase
-  .from('users')
-  .select('role')
-  .eq('email', user.email)
-  .single();
+    .from('users')
+    .select('role')
+    .eq('email', user.email)
+    .single();
 
   if (dbError || !userData || userData.role !== 'admin') {
     return res.status(403).json({
@@ -162,27 +170,25 @@ const approveRequestHelper = async (reqTimeStamp, req, res) => {
   // update the status field
   const { approveStatusReturnData, updateStatusError } = await supabase
     .from('slots')
-    .update({ status: "approved" })
-    .match({ slot_time: reqTimeStamp })
-  
+    .update({ status: 'approved' })
+    .match({ slot_time: reqTimeStamp });
+
   // handle potential error with approving time slot status
   if (updateStatusError) {
     return res.status(400).json({
-      error: updateStatusError
-    })
+      error: updateStatusError,
+    });
   }
   // successfully approved a time slot
   return res.status(200).json({
     message: `successfully updated time slot (${reqTimeStamp}) status from waiting to approved`,
-    return_data: approveStatusReturnData
-  })
-}
+    return_data: approveStatusReturnData,
+  });
+};
 
 //helper to reject a time slot - admin only
 const rejectRequestHelper = async (reqTimeStamp, req, res) => {
-
-  const token =
-    req.cookies.session || req.headers.authorization?.split(' ')[1];
+  const token = req.cookies.session || req.headers.authorization?.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({ error: 'Not authenticated' });
@@ -199,10 +205,10 @@ const rejectRequestHelper = async (reqTimeStamp, req, res) => {
   }
 
   const { data: userData, error: dbError } = await supabase
-  .from('users')
-  .select('role')
-  .eq('email', user.email)
-  .single();
+    .from('users')
+    .select('role')
+    .eq('email', user.email)
+    .single();
 
   if (dbError || !userData || userData.role !== 'admin') {
     return res.status(403).json({
@@ -212,20 +218,23 @@ const rejectRequestHelper = async (reqTimeStamp, req, res) => {
 
   const { rejectStatusReturnData, rejectStatusError } = await supabase
     .from('slots')
-    .update({ status: "rejected" })
-    .match({ slot_time: reqTimeStamp })
+    .update({ status: 'rejected' })
+    .match({ slot_time: reqTimeStamp });
   // handle potential error with approving time slot status
   if (rejectStatusError) {
     return res.status(400).json({
-      error: rejectStatusError
-    })
+      error: rejectStatusError,
+    });
   }
   // updated status from waiting to rejected
   return res.status(200).json({
     message: `successfully updated time slot (${reqTimeStamp}) status from waiting to rejected`,
-    return_data: rejectStatusReturnData
-  })
-}
+    return_data: rejectStatusReturnData,
+  });
+};
 
-module.exports = { newRequestController, approveRequestController, rejectRequestController }
-
+module.exports = {
+  newRequestController,
+  approveRequestController,
+  rejectRequestController,
+};
