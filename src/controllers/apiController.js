@@ -233,8 +233,71 @@ const rejectRequestHelper = async (reqTimeStamp, req, res) => {
   });
 };
 
+// Helper function to calculate Monday of the current week and the next 3 weeks
+const getWeekStartDate = (date) => {
+  const dayOfWeek = date.getDay();
+  // Calculate the offset to the previous Monday
+  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - diffToMonday); // Set to the previous Monday
+  return monday;
+};
+
+// Helper function to get the next 3 weeks' slots
+const getSlotsController = async (req, res) => {
+  try {
+    // Get the current date
+    const currentDate = new Date();
+
+    // Get the week_start_date for the current week (Monday of this week)
+    const currentWeekStart = getWeekStartDate(currentDate);
+
+    // Calculate the next 3 weeks' start dates (Mondays)
+    let weekStartDates = [currentWeekStart];
+    for (let i = 1; i <= 3; i++) {
+      let nextWeekStart = new Date(currentWeekStart);
+      // Add 7 days for the next Monday
+      nextWeekStart.setDate(currentWeekStart.getDate() + i * 7);
+      weekStartDates.push(nextWeekStart);
+    }
+
+    // Format the week start dates as 'yyyy-mm-dd'
+    weekStartDates = weekStartDates.map(
+      (date) => date.toISOString().split('T')[0]
+    );
+
+    // Fetch all slots for the next 4 weeks
+    const { data: slots, error } = await supabase
+      .from('slots')
+      .select('*')
+      .in('week_start_date', weekStartDates) // Filter by the week_start_date
+      .order('week_start_date', { ascending: true }); // Sort by week_start_date
+
+    if (error) {
+      return res
+        .status(500)
+        .json({ error: 'Failed to fetch slots', details: error });
+    }
+
+    // Organize the slots into weeks based on week_start_date
+    const groupedSlots = weekStartDates.map((date) => {
+      return {
+        week_start_date: date,
+        slots: slots.filter((slot) => slot.week_start_date === date),
+      };
+    });
+
+    // Return the structured JSON with the slots grouped by week_start_date
+    res.json({ weeks: groupedSlots });
+  } catch (error) {
+    console.error('Error fetching slots:', error);
+    res.status(500).json({ error: 'Failed to fetch slots' });
+  }
+};
+
 module.exports = {
   newRequestController,
   approveRequestController,
   rejectRequestController,
+  getSlotsController,
 };
