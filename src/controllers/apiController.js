@@ -33,7 +33,6 @@ const newRequestController = async (req, res) => {
 };
 
 
-
 //handles when an admin approves a list of pending time slots
 const approveRequestController = async (req, res) => {
   const { reqTimeStampList } = req.body;
@@ -53,25 +52,26 @@ const rejectRequestController = async (req, res) => {
   }
 };
 
+//gets all slots matching a certain user_id
+const getUserSlotsController = async (req, res) => {
+  const { user_id } = req.query;
 
+  if (!user_id) {
+    return res.status(400).json({ error: 'Missing user_id in query' });
+  }
 
+  const { data, error } = await supabase
+    .from('slots')
+    .select('*')
+    .eq('user_id', user_id)
+    .order('slot_time', { ascending: true });
 
+  if (error) {
+    return res.status(500).json({ error: 'Failed to fetch user slots', details: error.message });
+  }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  return res.status(200).json({ slots: data });
+};
 
 
 //helper for processing new time slot submission from volunteer
@@ -309,4 +309,5 @@ module.exports = {
   approveRequestController,
   rejectRequestController,
   getSlotsController,
+  getUserSlotsController,
 };

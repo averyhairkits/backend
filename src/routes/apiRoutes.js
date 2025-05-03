@@ -5,6 +5,7 @@ const {
   approveRequestController,
   rejectRequestController,
   getSlotsController,
+  getUserSlotsController,
 } = require('../controllers/apiController');
 
 // client request to volunteer on specific date and time
@@ -14,5 +15,8 @@ router.post('/reject_request', rejectRequestController);
 
 // admin client request to get all available time slots
 router.get('/get_slots', getSlotsController);
+
+//volunteer client request to get all time slots for a certain user
+router.get('/get_user_slots', getUserSlotsController);
 
 module.exports = router;
