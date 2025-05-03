@@ -1,21 +1,38 @@
 const supabase = require('../config/supabase');
 
-//handles a new volunteer making an availability submission
 const newRequestController = async (req, res) => {
-  const { reqTimeStampList, request_size } = req.body;
-  // get the user who made this request
-  // const user = supabase.auth.user()
-  // if (user.role != "volunteer"){
-  //   res.status(400).json({
-  //     error: "only volunteer can request to volunteer"
-  //   })
-  // }
+  const { reqTimeStampList, request_size, user_id } = req.body;
 
-  //iterate through each time slot, calling helper on each
-  for (let i = 0; i < reqTimeStampList.length; i++) {
-    newRequestHelper(reqTimeStampList[i], request_size, res);
+  console.log("here is request Time stamp list", reqTimeStampList);
+  console.log("here is request size", request_size);
+  console.log("here is userid", user_id);
+
+  try {
+    const results = await Promise.all(
+      reqTimeStampList.map(async (timestamp) => {
+        try {
+          const result = await newRequestHelper(timestamp, request_size, user_id);
+          return { timestamp, status: 'ok', result };
+        } catch (err) {
+          return { timestamp, status: 'error', error: err.message };
+        }
+      })
+    );
+
+    return res.status(200).json({
+      message: 'Processed all slot submissions',
+      results,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Unexpected failure in processing slots',
+      details: error.message,
+    });
   }
 };
+
+
 
 //handles when an admin approves a list of pending time slots
 const approveRequestController = async (req, res) => {
@@ -36,8 +53,29 @@ const rejectRequestController = async (req, res) => {
   }
 };
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //helper for processing new time slot submission from volunteer
-const newRequestHelper = async (reqTimeStamp, request_size, res) => {
+const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
   //calculate start of this week
   const now = new Date(); // what day is it today
   const dayOfWeek = now.getDay(); // date of this week's Sunday
@@ -49,22 +87,16 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
 
   if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21) {
     // requested time more than three weeks from this week's sunday
-    return res.status(400).json({
-      error: 'cannot register for time slots three weeks from this week',
-    });
+    throw new Error('Cannot register more than 3 weeks ahead');
   }
 
   // search to see whether this time slot exists or not
-  const { data, searchError } = await supabase
+  const { data, error: searchError } = await supabase
     .from('slots')
     .select('*')
     .eq('slot_time', reqTimeStamp);
 
-  if (searchError) {
-    return res.status(400).json({
-      error: searchError,
-    });
-  }
+  if (searchError) throw new Error(searchError.message);
 
   if (data.length === 0) {
     // no such slots for now
@@ -75,7 +107,8 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
       week_start_date: thisWeekSunday.toISOString(),
       current_size: request_size,
       status: 'waiting',
-    };
+      user_id: userid,
+    }
 
     //insert into slots db
     const { data: slotReturnInfo, error: createRequestError } = await supabase
@@ -84,57 +117,33 @@ const newRequestHelper = async (reqTimeStamp, request_size, res) => {
 
     if (createRequestError) {
       // handle error with supabase creating new row
-      console.error(
-        'Error creating new_request; error inserting row:',
-        createRequestError
-      );
-      return res.status(400).json({
-        error: `Error creating new_request; error inserting row: ${createRequestError.message}`,
-        errorDetail: `${createRequestError.details}`,
-      });
+      throw new Error(createError.message);
     }
+    
+    return { status: 'inserted', time: reqTimeStamp };
+  }
+  const existing = data[0];
 
-    return res.status(201).json({
-      message: 'request created successfully, wait to be approved',
-      slot_info: slotReturnInfo,
-    });
+  if (existing.status === 'rejected') {
+    throw new Error(`Slot ${reqTimeStamp} is unavailable.`);
   }
 
-  // slots exists
-  if (request_size + data.current_size > 6) {
-    // request_size is too large
-    return res.status(400).json({
-      error: `request size plus current exceeds 6, current size is ${data.current_size}`,
-    });
+  if (existing.current_size + request_size > 6) {
+    throw new Error(`Slot ${reqTimeStamp} exceeds max volunteers.`);
   }
 
-  if (data.status === 'rejected') {
-    // cannot request to volunteer on time slots already rejected by Petina
-    return res.status(400).json({
-      error: `Time slots ${reqTimeStamp} is unavailable. Please choose another time slot`,
-    });
-  }
-
-  // already has this slot, we update existing row instead of insert new row
-  const { updateReturnData, error } = await supabase
+  const { error: updateError } = await supabase
     .from('slots')
-    .update({ current_size: request_size + data.current_size })
+    .update({ current_size: existing.current_size + request_size })
     .match({ slot_time: reqTimeStamp });
 
-  if (error) {
-    // handle error with supabase creating new row
-    console.error('Error creating new_request; error inserting row:', error);
-    return res.status(400).json({
-      error: `Error creating new_request; error inserting row: ${error.message}`,
-      errorDetail: `${error.details}`,
-    });
-  }
+  if (updateError) throw new Error(updateError.message);
 
-  return res.status(201).json({
-    message: 'request created successfully, wait to be approved',
-    slot_info: updateReturnData,
-  });
+  return { status: 'updated', time: reqTimeStamp };
 };
+
+
+
 
 //handles approving a time slot - admin only
 const approveRequestHelper = async (reqTimeStamp, req, res) => {
