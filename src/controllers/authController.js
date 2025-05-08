@@ -124,7 +124,7 @@ const authController = {
 
       const { data: userData, error: dbError } = await supabase
         .from('users')
-        .select('id, username, email, firstname, lastname')
+        .select('id, username, email, firstname, lastname, role')
         .eq('email', user.email)
         .single();
 

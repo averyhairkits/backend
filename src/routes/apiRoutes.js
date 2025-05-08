@@ -20,6 +20,4 @@ router.get('/get_slots', getSlotsController);
 //volunteer client request to get all time slots for a certain user
 router.get('/get_user_slots', getUserSlotsController);
 
-router.get('/get_users', userController);
-
 module.exports = router;
