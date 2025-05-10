@@ -52,41 +52,21 @@ const rejectRequestController = async (req, res) => {
   }
 };
 
-//gets all slots matching a certain user_id
-const getUserSlotsController = async (req, res) => {
-  const { user_id } = req.query;
-
-  if (!user_id) {
-    return res.status(400).json({ error: 'Missing user_id in query' });
-  }
-
-  const { data, error } = await supabase
-    .from('slots')
-    .select('*')
-    .eq('user_id', user_id)
-    .order('slot_time', { ascending: true });
-
-  if (error) {
-    return res.status(500).json({ error: 'Failed to fetch user slots', details: error.message });
-  }
-
-  return res.status(200).json({ slots: data });
-};
 
 
 //helper for processing new time slot submission from volunteer
 const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
-  //calculate start of this week
-  const now = new Date(); // what day is it today
-  const dayOfWeek = now.getDay(); // date of this week's Sunday
-  const diffToSunday = dayOfWeek === 0 ? 0 : -1 * dayOfWeek; //this week start date
-  const thisWeekSunday = new Date(now);
-  thisWeekSunday.setDate(dayOfWeek + diffToSunday);
-
   const requestedDate = new Date(reqTimeStamp);
 
-  if ((requestedDate - thisWeekSunday) / (1000 * 60 * 60 * 24) >= 21) {
-    // requested time more than three weeks from this week's sunday
+  const weekStart = getWeekStartDate(requestedDate);
+
+  //reject if more than 3 weeks ahead from this week's Monday
+  const today = new Date();
+  const todayWeekStart = getWeekStartDate(today);
+  const maxDate = new Date(todayWeekStart);
+  maxDate.setDate(maxDate.getDate() + 21);
+
+  if (requestedDate > maxDate) {
     throw new Error('Cannot register more than 3 weeks ahead');
   }
 
@@ -99,29 +79,25 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
   if (searchError) throw new Error(searchError.message);
 
   if (data.length === 0) {
-    // no such slots for now
-    // other people haven't requested to volunteer at this time yet
     const newRequest = {
       created_at: new Date().toISOString(),
       slot_time: new Date(reqTimeStamp).toISOString(),
-      week_start_date: thisWeekSunday.toISOString(),
+      week_start_date: weekStart.toISOString().split('T')[0],
       current_size: request_size,
       status: 'waiting',
       user_id: userid,
-    }
+    };
 
-    //insert into slots db
     const { data: slotReturnInfo, error: createRequestError } = await supabase
       .from('slots')
       .insert([newRequest]);
 
     if (createRequestError) {
-      // handle error with supabase creating new row
-      throw new Error(createError.message);
+      throw new Error(createRequestError.message);
     }
-    
     return { status: 'inserted', time: reqTimeStamp };
   }
+
   const existing = data[0];
 
   if (existing.status === 'rejected') {
@@ -141,7 +117,6 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
 
   return { status: 'updated', time: reqTimeStamp };
 };
-
 
 
 
@@ -245,12 +220,13 @@ const rejectRequestHelper = async (reqTimeStamp, req, res) => {
 // Helper function to calculate Monday of the current week and the next 3 weeks
 const getWeekStartDate = (date) => {
   const dayOfWeek = date.getDay();
-  // Calculate the offset to the previous Monday
-  const diffToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
   const monday = new Date(date);
-  monday.setDate(date.getDate() - diffToMonday); // Set to the previous Monday
+  monday.setDate(monday.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
   return monday;
 };
+
 
 // Helper function to get the next 3 weeks' slots
 const getSlotsController = async (req, res) => {
@@ -297,15 +273,16 @@ const getSlotsController = async (req, res) => {
     });
 
     // Return the structured JSON with the slots grouped by week_start_date
-    res.json({ weeks: groupedSlots });
+    res.json({ 
+      weeks: groupedSlots, 
+    });
   } catch (error) {
     console.error('Error fetching slots:', error);
     res.status(500).json({ error: 'Failed to fetch slots' });
   }
 };
 
-const userController = {
-  async getAllUsers(req, res) {
+const userController = async (req, res) => {
     try {
       const { data: users, error } = await supabase
         .from('users')
@@ -321,9 +298,61 @@ const userController = {
       console.error('Unexpected error in getAllUsers:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
-  }
-};
+  };
 
+
+//gets all slots matching a certain user_id
+const getUserSlotsController = async (req, res) => {
+  //check for user_id in query
+  const { user_id } = req.query; 
+  if (!user_id) {
+    return res.status(400).json({ error: 'Missing user_id in query' });
+  }
+
+  try {
+    //search for slots matching user_id in order of slot_time
+    const { data, error } = await supabase
+      .from('slots')
+      .select('*')
+      .eq('user_id', user_id)
+      .order('slot_time', { ascending: true });
+    if (error) {
+      return res.status(500).json({ error: 'Failed to fetch user slots', details: error.message });
+    }
+
+    const slotTotals = {};
+    for (const slot of data) {
+      const time = slot.slot_time;
+      slotTotals[time] = (slotTotals[time] || 0) + slot.current_size;
+    }
+
+    const overbookedSlots = Object.entries(slotTotals)
+      .filter(([_, total]) => total >= 6)
+      .map(([slot_time, total_size]) => ({ slot_time, total_size }));
+
+    const grouped = {};
+    for (const slot of data) {
+      const weekStart = getWeekStartDate(new Date(slot.slot_time));
+      if (!grouped[weekStart]) grouped[weekStart] = [];
+      grouped[weekStart].push(slot);
+    }
+
+    const groupedSlots = Object.entries(grouped).map(([week_start_date, slots]) => ({
+      week_start_date,
+      slots,
+    }));
+
+    return res.status(200).json({
+      weeks: groupedSlots,
+      summary: {
+        overbookedSlots,
+      },
+    });
+  } catch (err) {
+    console.error('Unexpected error in getUserSlotsController:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  };
+}
 
 module.exports = {
   newRequestController,
@@ -331,5 +360,5 @@ module.exports = {
   rejectRequestController,
   getSlotsController,
   getUserSlotsController,
-  userController,
+  userController
 };
