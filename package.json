@@ -33,6 +33,6 @@
     "eslint-plugin-no-relative-import-paths": "latest",
     "eslint-plugin-prettier": "latest",
     "nodemon": "^3.1.9",
-    "prettier": "latest"
+    "prettier": "^3.5.3"
   }
 }
