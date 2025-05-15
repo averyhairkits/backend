@@ -15,8 +15,9 @@ const grantAdminController = async (req, res) => {
   } = await supabase.auth.getUser(token);
 
   if (userError || !user) {
-    return res.status(401).json({ error: 'Authentication failed' });
-  }
+  console.error('Supabase getUser error:', userError);
+  return res.status(401).json({ error: 'Authentication failed', details: userError });
+}
 
   const { data: userData, error: dbError } = await supabase
   .from('users')
@@ -24,9 +25,9 @@ const grantAdminController = async (req, res) => {
   .eq('email', user.email)
   .single();
 
-  if (dbError || !userData || userData.role !== 'superadmin') {
+  if (dbError || !userData || userData.role !== 'admin') {
     return res.status(403).json({
-      error: 'Only logged-in superadmin can grant admin status',
+      error: 'Only logged-in admin can grant admin status',
     });
   }
 
@@ -60,7 +61,7 @@ const grantAdminController = async (req, res) => {
   // we only update their role if role == volunteer
   if (data.role != "volunteer"){
     return res.status(401).json({
-      error: `Failed to update user to Admin. The user is ${data.role}`
+      error: `Failed to update user to Admin. The user is already a(n) ${data.role}`
     });
   }
 
