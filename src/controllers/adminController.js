@@ -8,8 +8,38 @@ const approveRequestController = async (req, res) => {
   if (!start || !end) {
     return res.status(400).json({ error: 'Missing start or end time' });
   }
+  //map of attending volunteer's ids
+  const attendingVolunteerIds = await findOverlappingHelper(start, end, res);
+  const insertedSessionId = await insertSessionHelper({ title, description, start, end, created_by }, res);
+  await linkVolunteersHelper(insertedSessionId, attendingVolunteerIds, res);
 
-  const { data, error } = await supabase
+  return res.status(200).json({ 
+    message: 'Session created and volunteers linked', 
+    session: insertedSessionId
+  });
+
+};
+
+const findOverlappingHelper = async (start, end, res) => {
+  //find volunteer slots overlapping with the session time
+  const { data: overlappingSlotsData, error: slotError } = await supabase
+    .from('slots')
+    .select('user_id')
+    .gte('slot_time', new Date(start).toISOString())
+    .lt('slot_time', new Date(end).toISOString());
+
+  if (slotError) {
+    return res.status(500).json({ error: 'Failed to fetch volunteer slots', details: slotError.message });
+  }
+
+  //deduplicate user_ids
+  const uniqueUserIds = [...new Set(overlappingSlotsData.map((slot) => slot.user_id))];
+  
+  return uniqueUserIds;
+};
+
+const insertSessionHelper = async ({title, description, start, end, created_by}, res) => {
+  const { data: sessionInsertData, error: sessionError } = await supabase
     .from('sessions')
     .insert([
       {
@@ -24,14 +54,32 @@ const approveRequestController = async (req, res) => {
     .select()
     .single();
 
-  if (error) {
-    console.error('Supabase insert error:', error);
+  if (sessionError || !sessionInsertData || sessionInsertData.length === 0) {
     return res.status(500).json({
       error: 'Database insert failed',
-      details: error.message,});
+      details: sessionError?.message,
+    });
   }
+  const sessionId = sessionInsertData.id;
 
-  return res.status(200).json({ message: 'Confirmed time block saved from backend', session: data });
+  return sessionId;
+};
+
+
+const linkVolunteersHelper = async (sessionId, userIds, res) => {
+  //link volunteers to session
+  const volunteerLinks = userIds.map((userId) => ({
+    session_id: sessionId,
+    volunteer_id: userId,
+  }));
+
+  const { error: linkError } = await supabase
+    .from('session_volunteers')
+    .insert(volunteerLinks);
+
+  if (linkError) {
+    res.status(500).json({ error: 'Failed to link volunteers', details: error.message });
+  }
 };
 
 
