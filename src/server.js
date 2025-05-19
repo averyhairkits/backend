@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/authRoutes');
 const apiRoutes = require('./routes/apiRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 
 const corsOptions = {
@@ -45,6 +46,7 @@ app.use((req, res, next) => {
 
 app.use('/auth', authRoutes);
 app.use('/api', apiRoutes);
+app.use('/admin', adminRoutes);
 
 // handel date processing
 console.log("debugger 1.0")

@@ -3,10 +3,6 @@ const supabase = require('../config/supabase');
 const newRequestController = async (req, res) => {
   const { reqTimeStampList, request_size, user_id } = req.body;
 
-  console.log("here is request Time stamp list", reqTimeStampList);
-  console.log("here is request size", request_size);
-  console.log("here is userid", user_id);
-
   try {
     const results = await Promise.all(
       reqTimeStampList.map(async (timestamp) => {
@@ -29,26 +25,6 @@ const newRequestController = async (req, res) => {
       error: 'Unexpected failure in processing slots',
       details: error.message,
     });
-  }
-};
-
-
-//handles when an admin approves a list of pending time slots
-const approveRequestController = async (req, res) => {
-  const { reqTimeStampList } = req.body;
-
-  for (let i = 0; i < reqTimeStampList.length; i++) {
-    approveRequestHelper(reqTimeStampList[i], req, res);
-  }
-};
-
-//handles when an admin rejects a list of pending time slots
-const rejectRequestController = async (req, res) => {
-  const { reqTimeStampList } = req.body;
-  // update the status field
-
-  for (let i = 0; i < reqTimeStampList.length; i++) {
-    rejectRequestHelper(reqTimeStampList[i], req, res);
   }
 };
 
@@ -119,104 +95,6 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
 };
 
 
-
-//handles approving a time slot - admin only
-const approveRequestHelper = async (reqTimeStamp, req, res) => {
-  //retrieve token from cookie or auth header
-  const token = req.cookies.session || req.headers.authorization?.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-
-  // get the user who made this request
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(token);
-
-  if (userError || !user) {
-    return res.status(401).json({ error: 'Authentication failed' });
-  }
-
-  const { data: userData, error: dbError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('email', user.email)
-    .single();
-
-  if (dbError || !userData || userData.role !== 'admin') {
-    return res.status(403).json({
-      error: 'Only logged-in admins can approve a time slot',
-    });
-  }
-
-  // update the status field
-  const { approveStatusReturnData, updateStatusError } = await supabase
-    .from('slots')
-    .update({ status: 'approved' })
-    .match({ slot_time: reqTimeStamp });
-
-  // handle potential error with approving time slot status
-  if (updateStatusError) {
-    return res.status(400).json({
-      error: updateStatusError,
-    });
-  }
-  // successfully approved a time slot
-  return res.status(200).json({
-    message: `successfully updated time slot (${reqTimeStamp}) status from waiting to approved`,
-    return_data: approveStatusReturnData,
-  });
-};
-
-//helper to reject a time slot - admin only
-const rejectRequestHelper = async (reqTimeStamp, req, res) => {
-  const token = req.cookies.session || req.headers.authorization?.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-
-  // get the user who made this request
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(token);
-
-  if (userError || !user) {
-    return res.status(401).json({ error: 'Authentication failed' });
-  }
-
-  const { data: userData, error: dbError } = await supabase
-    .from('users')
-    .select('role')
-    .eq('email', user.email)
-    .single();
-
-  if (dbError || !userData || userData.role !== 'admin') {
-    return res.status(403).json({
-      error: 'Only logged-in admins can reject a time slot',
-    });
-  }
-
-  const { rejectStatusReturnData, rejectStatusError } = await supabase
-    .from('slots')
-    .update({ status: 'rejected' })
-    .match({ slot_time: reqTimeStamp });
-  // handle potential error with approving time slot status
-  if (rejectStatusError) {
-    return res.status(400).json({
-      error: rejectStatusError,
-    });
-  }
-  // updated status from waiting to rejected
-  return res.status(200).json({
-    message: `successfully updated time slot (${reqTimeStamp}) status from waiting to rejected`,
-    return_data: rejectStatusReturnData,
-  });
-};
-
 // Helper function to calculate Monday of the current week and the next 3 weeks
 const getWeekStartDate = (date) => {
   const dayOfWeek = date.getDay();
@@ -261,7 +139,7 @@ const getSlotsController = async (req, res) => {
     if (error) {
       return res
         .status(500)
-        .json({ error: 'Failed to fetch slots', details: error });
+        .json({ error: 'Failed to fetch slotss', details: error });
     }
 
     // Organize the slots into weeks based on week_start_date
@@ -281,6 +159,7 @@ const getSlotsController = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch slots' });
   }
 };
+
 
 const userController = async (req, res) => {
     try {
@@ -356,8 +235,6 @@ const getUserSlotsController = async (req, res) => {
 
 module.exports = {
   newRequestController,
-  approveRequestController,
-  rejectRequestController,
   getSlotsController,
   getUserSlotsController,
   userController
