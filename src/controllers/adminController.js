@@ -3,7 +3,7 @@ const supabase = require('../config/supabase');
 
 //handles when an admin approves a list of pending time slots
 const approveRequestController = async (req, res) => {
-  const { title, start, end, description, volunteers } = req.body;
+  const { title, start, end, description, volunteers, created_by  } = req.body;
 
   if (!start || !end) {
     return res.status(400).json({ error: 'Missing start or end time' });
@@ -18,6 +18,7 @@ const approveRequestController = async (req, res) => {
         start: new Date(start).toISOString(),
         end: new Date(end).toISOString(),
         status: 'confirmed',
+        created_by: created_by,
       },
     ])
     .select()
