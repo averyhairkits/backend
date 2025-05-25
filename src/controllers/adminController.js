@@ -92,7 +92,7 @@ const cancelRequestController = async (req, res) => {
 
   const { error } = await supabase
     .from('sessions')
-    .update({ status: 'cancelled' })
+    .delete()
     .eq('id', id);
 
   if (error) {
@@ -102,7 +102,7 @@ const cancelRequestController = async (req, res) => {
     });
   }
 
-  return res.status(200).json({ message: 'Session status updated to cancelled' });
+  return res.status(200).json({ message: 'Session successfully cancelled' });
 };
 
 
