@@ -10,12 +10,14 @@ const approveRequestController = async (req, res) => {
   }
   //map of attending volunteer's ids
   const attendingVolunteerIds = await findOverlappingHelper(start, end, res);
+
   const insertedSessionId = await insertSessionHelper({ title, description, start, end, created_by }, res);
+
   await linkVolunteersHelper(insertedSessionId, attendingVolunteerIds, res);
 
   return res.status(200).json({ 
     message: 'Session created and volunteers linked', 
-    session: insertedSessionId
+    session: insertedSessionId,
   });
 
 };
@@ -25,18 +27,18 @@ const findOverlappingHelper = async (start, end, res) => {
   const { data: overlappingSlotsData, error: slotError } = await supabase
     .from('slots')
     .select('user_id')
-    .gte('slot_time', new Date(start).toISOString())
-    .lt('slot_time', new Date(end).toISOString());
+    .gte('slot_time', start)
+    .lt('slot_time', end);
 
   if (slotError) {
-    return res.status(500).json({ error: 'Failed to fetch volunteer slots', details: slotError.message });
+     throw new Error('Failed to fetch volunteer slots: ', slotError.message);
   }
 
   //deduplicate user_ids
   const uniqueUserIds = [...new Set(overlappingSlotsData.map((slot) => slot.user_id))];
-  
   return uniqueUserIds;
 };
+
 
 const insertSessionHelper = async ({title, description, start, end, created_by}, res) => {
   const { data: sessionInsertData, error: sessionError } = await supabase
@@ -45,8 +47,8 @@ const insertSessionHelper = async ({title, description, start, end, created_by},
       {
         title,
         description,
-        start: new Date(start).toISOString(),
-        end: new Date(end).toISOString(),
+        start: start,
+        end: end,
         status: 'confirmed',
         created_by: created_by,
       },
@@ -55,7 +57,7 @@ const insertSessionHelper = async ({title, description, start, end, created_by},
     .single();
 
   if (sessionError || !sessionInsertData || sessionInsertData.length === 0) {
-    return res.status(500).json({
+    throw new Error({
       error: 'Database insert failed',
       details: sessionError?.message,
     });
@@ -78,7 +80,7 @@ const linkVolunteersHelper = async (sessionId, userIds, res) => {
     .insert(volunteerLinks);
 
   if (linkError) {
-    res.status(500).json({ error: 'Failed to link volunteers', details: error.message });
+    throw new Error('Failed to link volunteers', linkError.message);
   }
 };
 
