@@ -1,88 +1,35 @@
 const supabase = require('../config/supabase');
 
-const grantAdminController = async (req, res) => {
-  // get jwt token
-  const token =
-    req.cookies.session || req.headers.authorization?.split(' ')[1];
+const updateRoleController = async (req, res) => {
+  const { usertoupdate } = req.body;
 
-  if (!token) {
-    return res.status(401).json({ error: 'Not authenticated' });
-  }
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser(token);
-
-  if (userError || !user) {
-    return res.status(401).json({ error: 'Authentication failed' });
-  }
-
-  const { data: userData, error: dbError } = await supabase
-  .from('users')
-  .select('role')
-  .eq('email', user.email)
-  .single();
-
-  if (dbError || !userData || userData.role !== 'superadmin') {
-    return res.status(403).json({
-      error: 'Only logged-in superadmin can grant admin status',
+  if (!usertoupdate || !usertoupdate.id || !usertoupdate.role) {
+    return res.status(400).json({
+      error: 'Invalid user object or missing role field in request',
     });
   }
 
-  const { targetUserId } = req.body;
+  const currentRole = usertoupdate.role;
+  const newRole = currentRole === 'admin' ? 'volunteer' : 'admin';
 
-  const { data, error } = await supabase
+  console.log('NEWROLE', newRole);
+
+  const { data: updatedUser, error: updateError } = await supabase
     .from('users')
-    .select('*')
-    .eq('id', targetUserId)
-    .single();
+    .update({ role: newRole })
+    .eq('id', usertoupdate.id);
 
-  console.log(`debugger: ${targetUserId}`)
-  console.log(`debugger: ${data}`)
-
-  // handle error
-  if (error){
-    return res.status(401).json({
-      error: "cannot find the user",
-      detail: error
+  if (updateError) {
+    return res.status(500).json({
+      error: 'Failed to update role',
+      detail: updateError,
     });
   }
 
-  // handle that user is found 
-  if (!data) {
-    return res.status(404).json({
-      error: "User not found"
-    });
-  }
-
-  // if the target user is already superadmin or admin we don't update
-  // we only update their role if role == volunteer
-  if (data.role != "volunteer"){
-    return res.status(401).json({
-      error: `Failed to update user to Admin. The user is ${data.role}`
-    });
-  }
-
-  // update the role
-  const { grantStatusReturnData, grantStatusError } = await supabase
-    .from('users')
-    .update({ role: "admin" })
-    .match({ id: targetUserId })
-  
-  // handle error with updating the role
-  if (grantStatusError){
-    return res.status(401).json({
-      error: `failed to update status: ${grantStatusError}`
-    })
-  }
-
-  // successfully updated role to admin
   return res.status(200).json({
-    result: "successfully updated user role to admin",
-    detail: grantStatusReturnData
-  })
+    message: `User role successfully updated to ${newRole}`,
+    user: updatedUser,
+  });
+};
 
-}
-
-module.exports = {grantAdminController}
+module.exports = { updateRoleController };
