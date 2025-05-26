@@ -33,7 +33,6 @@ const findOverlappingHelper = async (start, end, res) => {
   if (slotError) {
      throw new Error('Failed to fetch volunteer slots: ', slotError.message);
   }
-  console.log("here is findOverlapping returned data", overlappingSlotsData)
 
   const userMap = new Map();
 
@@ -134,8 +133,6 @@ const formatLocalDateTimeForDB = (date) => {
 };
 
 
-
-
 const cancelRequestController = async (req, res) => {
   const { id } = req.params;
 
@@ -145,7 +142,7 @@ const cancelRequestController = async (req, res) => {
 
   const { error } = await supabase
     .from('sessions')
-    .delete()
+    .update({ status: 'cancelled' })
     .eq('id', id);
 
   if (error) {

@@ -10,7 +10,7 @@ const {
 
 router.post('/approve_request', approveRequestController);
 
-router.delete('/cancel_request/:id', cancelRequestController);
+router.put('/cancel_request/:id', cancelRequestController);
 
 router.get('/get_sessions', getSessionsController);
 
