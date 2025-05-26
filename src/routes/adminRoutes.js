@@ -6,7 +6,7 @@ const {
   getSessionsController,
   getSlotsController,
   userController,
-  matchVolunteersController
+  matchVolunteersController,
 } = require('../controllers/adminController');
 
 router.post('/approve_request', approveRequestController);

@@ -21,38 +21,40 @@ const supabase = require('../config/supabase');
  */
 const newRequestController = async (req, res) => {
   const { reqTimes } = req.body;
-    //iterate reqTimes, call helper on each
-    try {
-      const results = await Promise.all(
-        reqTimes.map(async ({ slot_time, request_size, user_id }) => {
-          try {
-            //call to helper function
-            const result = await newRequestHelper(slot_time, request_size, user_id);
-            return { timestamp: slot_time, status: 'ok', result };
-          } catch (err) {
-            return { timestamp: slot_time, status: 'error', error: err.message };
-          }
-        })
-      );
-      return res.status(200).json({
-        message: 'Processed all slot submissions',
-        results,
-      });
-
-    } catch (error) {
-      return res.status(500).json({
-        error: 'Unexpected failure in processing slots',
-        details: error.message,
-      });
-    }
-  };
-
+  //iterate reqTimes, call helper on each
+  try {
+    const results = await Promise.all(
+      reqTimes.map(async ({ slot_time, request_size, user_id }) => {
+        try {
+          //call to helper function
+          const result = await newRequestHelper(
+            slot_time,
+            request_size,
+            user_id
+          );
+          return { timestamp: slot_time, status: 'ok', result };
+        } catch (err) {
+          return { timestamp: slot_time, status: 'error', error: err.message };
+        }
+      })
+    );
+    return res.status(200).json({
+      message: 'Processed all slot submissions',
+      results,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: 'Unexpected failure in processing slots',
+      details: error.message,
+    });
+  }
+};
 
 /**
- * 
+ *
  * helper for processing new time slot submission from volunteer
  * handles new slot submissions from users
- * 
+ *
  */
 const newRequestHelper = async (reqTimeStamp, request_size, userid) => {
   //extract date of reqTimeStamp
@@ -104,7 +106,10 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid) => {
   const otherSlots = data.filter((slot) => slot.user_id !== userid);
 
   //calculate current total from others
-  const otherTotalSize = otherSlots.reduce((sum, slot) => sum + slot.current_size, 0);
+  const otherTotalSize = otherSlots.reduce(
+    (sum, slot) => sum + slot.current_size,
+    0
+  );
 
   //total size if we add this request
   const proposedTotal = otherTotalSize + request_size;
@@ -141,8 +146,7 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid) => {
   if (createError) throw new Error(createError.message);
 
   return { status: 'inserted', time: reqTimeStamp };
-}
-
+};
 
 // helper function to calculate Monday of the current week and the next 3 weeks
 const getWeekStartDate = (date) => {
@@ -157,7 +161,7 @@ const getWeekStartDate = (date) => {
 //gets all slots matching a certain user_id
 const getUserSlotsController = async (req, res) => {
   //check for user_id in query
-  const { user_id } = req.query; 
+  const { user_id } = req.query;
   if (!user_id) {
     return res.status(400).json({ error: 'Missing user_id in query' });
   }
@@ -170,7 +174,9 @@ const getUserSlotsController = async (req, res) => {
       .eq('user_id', user_id)
       .order('slot_time', { ascending: true });
     if (error) {
-      return res.status(500).json({ error: 'Failed to fetch user slots', details: error.message });
+      return res
+        .status(500)
+        .json({ error: 'Failed to fetch user slots', details: error.message });
     }
 
     const slotTotals = {};
@@ -186,10 +192,12 @@ const getUserSlotsController = async (req, res) => {
       grouped[weekStart].push(slot);
     }
 
-    const groupedSlots = Object.entries(grouped).map(([week_start_date, slots]) => ({
-      week_start_date,
-      slots,
-    }));
+    const groupedSlots = Object.entries(grouped).map(
+      ([week_start_date, slots]) => ({
+        week_start_date,
+        slots,
+      })
+    );
 
     return res.status(200).json({
       weeks: groupedSlots,
@@ -197,10 +205,10 @@ const getUserSlotsController = async (req, res) => {
   } catch (err) {
     console.error('Unexpected error in getUserSlotsController:', err);
     return res.status(500).json({ error: 'Internal server error' });
-  };
-}
+  }
+};
 
 module.exports = {
   newRequestController,
-  getUserSlotsController
+  getUserSlotsController,
 };

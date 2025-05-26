@@ -17,7 +17,7 @@ const userController = {
       console.error('Unexpected error in getAllUsers:', err);
       return res.status(500).json({ error: 'Internal server error' });
     }
-  }
+  },
 };
 
 module.exports = userController;

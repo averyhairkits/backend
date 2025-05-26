@@ -1,25 +1,30 @@
 const supabase = require('../config/supabase');
 
-
 //handles when an admin approves a list of pending time slots
 const approveRequestController = async (req, res) => {
-  const { title, start, end, description, volunteers, created_by  } = req.body;
+  const { title, start, end, description, created_by } = req.body;
 
   if (!start || !end) {
     return res.status(400).json({ error: 'Missing start or end time' });
   }
   //map of attending volunteer's ids
-  const { uniqueUserIds, totalSize } = await findOverlappingHelper(start, end, res);
+  const { uniqueUserIds, totalSize } = await findOverlappingHelper(
+    start,
+    end,
+    res
+  );
 
-  const insertedSessionId = await insertSessionHelper({ title, description, start, end, created_by }, res);
+  const insertedSessionId = await insertSessionHelper(
+    { title, description, start, end, created_by },
+    res
+  );
 
   await linkVolunteersHelper(insertedSessionId, uniqueUserIds, res);
 
-  return res.status(200).json({ 
-    message: 'Session created and volunteers linked', 
+  return res.status(200).json({
+    message: 'Session created and volunteers linked',
     session: insertedSessionId,
   });
-
 };
 
 const findOverlappingHelper = async (start, end, res) => {
@@ -31,7 +36,7 @@ const findOverlappingHelper = async (start, end, res) => {
     .lt('slot_time', end);
 
   if (slotError) {
-     throw new Error('Failed to fetch volunteer slots: ', slotError.message);
+    throw new Error('Failed to fetch volunteer slots: ', slotError.message);
   }
 
   const userMap = new Map();
@@ -43,19 +48,28 @@ const findOverlappingHelper = async (start, end, res) => {
   }
 
   const uniqueUserIds = Array.from(userMap.keys());
-  const totalSize = Array.from(userMap.values()).reduce((sum, size) => sum + size, 0);
   
-  console.log("find overlapping helper result of unique users: ", uniqueUserIds);
-  console.log("find overlapping helper result of totalsize: ", totalSize);
+  const totalSize = Array.from(userMap.values()).reduce(
+    (sum, size) => sum + size,
+    0
+  );
+
+  console.log(
+    'find overlapping helper result of unique users: ',
+    uniqueUserIds
+  );
+  console.log('find overlapping helper result of totalsize: ', totalSize);
 
   return {
     uniqueUserIds,
-    totalSize
+    totalSize,
   };
 };
 
-
-const insertSessionHelper = async ({title, description, start, end, created_by}, res) => {
+const insertSessionHelper = async (
+  { title, description, start, end, created_by },
+  res
+) => {
   const { data: sessionInsertData, error: sessionError } = await supabase
     .from('sessions')
     .insert([
@@ -82,7 +96,6 @@ const insertSessionHelper = async ({title, description, start, end, created_by},
   return sessionId;
 };
 
-
 const linkVolunteersHelper = async (sessionId, userIds, res) => {
   //link volunteers to session
   const volunteerLinks = userIds.map((userId) => ({
@@ -97,10 +110,8 @@ const linkVolunteersHelper = async (sessionId, userIds, res) => {
   if (linkError) {
     throw new Error('Failed to link volunteers', linkError.message);
   }
-  console.log("succeeded")
+  console.log('succeeded');
 };
-
-
 
 const matchVolunteersController = async (req, res) => {
   const { start, end } = req.query;
@@ -117,8 +128,10 @@ const matchVolunteersController = async (req, res) => {
     const formattedStart = formatLocalDateTimeForDB(localStart);
     const formattedEnd = formatLocalDateTimeForDB(localEnd);
 
-    const { uniqueUserIds, totalSize } = await findOverlappingHelper(formattedStart, formattedEnd);
-
+    const { uniqueUserIds, totalSize } = await findOverlappingHelper(
+      formattedStart,
+      formattedEnd
+    );
 
     // fetch user details for each unique user: id, firstname, lastname, email
     const { data: usersData, error: usersError } = await supabase
@@ -131,14 +144,15 @@ const matchVolunteersController = async (req, res) => {
       return res.status(500).json({ error: 'Failed to fetch user info' });
     }
 
-    return res.status(200).json({ 
+    return res.status(200).json({
       volunteers: usersData,
       current_size: totalSize,
     });
-
   } catch (err) {
     console.error('Error in matchVolunteersController:', err.message);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
+    return res
+      .status(500)
+      .json({ error: 'Internal server error', details: err.message });
   }
 };
 
@@ -147,7 +161,6 @@ const formatLocalDateTimeForDB = (date) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
-
 
 const cancelRequestController = async (req, res) => {
   const { id } = req.params;
@@ -171,18 +184,16 @@ const cancelRequestController = async (req, res) => {
   return res.status(200).json({ message: 'Session successfully cancelled' });
 };
 
-
 /**
- * 
+ *
  * gets all sessions across all admins
  * GET /admin/get_slots
  * Request: -
  * Response : {
- *   weeks: groupedSlots 
+ *   weeks: groupedSlots
  * }
  */
 const getSessionsController = async (req, res) => {
-
   try {
     //search for slots in order of slot_time
     const { data, error } = await supabase
@@ -190,25 +201,26 @@ const getSessionsController = async (req, res) => {
       .select('*')
       .order('start', { ascending: true });
     if (error) {
-      return res.status(500).json({ error: 'Failed to fetch sessions', details: error.message });
+      return res
+        .status(500)
+        .json({ error: 'Failed to fetch sessions', details: error.message });
     }
 
     return res.status(200).json({
-      sessions: data
+      sessions: data,
     });
   } catch (err) {
     console.error('Unexpected error in getSessionsController:', err);
     return res.status(500).json({ error: 'Internal server error' });
-  };
-}
-
+  }
+};
 
 //get all slots for all users
 /**
  * GET /admin/get_slots
  * Request: -
  * Response : {
- *   weeks: groupedSlots 
+ *   weeks: groupedSlots
  * }
  */
 const getSlotsController = async (req, res) => {
@@ -255,8 +267,8 @@ const getSlotsController = async (req, res) => {
     });
 
     // return the structured JSON with the slots grouped by week_start_date
-    res.json({ 
-      weeks: groupedSlots, 
+    res.json({
+      weeks: groupedSlots,
     });
   } catch (error) {
     console.error('Error fetching slots:', error);
@@ -265,23 +277,22 @@ const getSlotsController = async (req, res) => {
 };
 
 const userController = async (req, res) => {
-    try {
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('id, email, firstname, lastname, role, created_at');
+  try {
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('id, email, firstname, lastname, role, created_at');
 
-      if (error) {
-        console.error('Error fetching users:', error);
-        return res.status(400).json({ error: error.message });
-      }
-
-      return res.status(200).json(users);
-    } catch (err) {
-      console.error('Unexpected error in getAllUsers:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+    if (error) {
+      console.error('Error fetching users:', error);
+      return res.status(400).json({ error: error.message });
     }
-  };
 
+    return res.status(200).json(users);
+  } catch (err) {
+    console.error('Unexpected error in getAllUsers:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 // helper function to calculate Monday of the current week and the next 3 weeks
 const getWeekStartDate = (date) => {
@@ -293,12 +304,11 @@ const getWeekStartDate = (date) => {
   return monday;
 };
 
-
-module.exports = { 
+module.exports = {
   approveRequestController,
   cancelRequestController,
   getSessionsController,
   getSlotsController,
   userController,
-  matchVolunteersController
+  matchVolunteersController,
 };

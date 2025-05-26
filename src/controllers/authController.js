@@ -4,7 +4,7 @@ const authController = {
   async signup(req, res) {
     try {
       const { email, password, firstname, lastname } = req.body;
-      console.log("debugger 0");
+      console.log('debugger 0');
       if (!email || !password || !firstname || !lastname) {
         console.log('debugger 1.0');
         return res.status(400).json({

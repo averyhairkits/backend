@@ -49,7 +49,7 @@ app.use('/api', apiRoutes);
 app.use('/admin', adminRoutes);
 
 // handel date processing
-console.log("debugger 1.0")
+console.log('debugger 1.0');
 app.use('/api', apiRoutes);
 
 app.get('/health', (req, res) => {

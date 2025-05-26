@@ -12,7 +12,7 @@ const updateRoleController = async (req, res) => {
   const currentRole = usertoupdate.role;
   const newRole = currentRole === 'admin' ? 'volunteer' : 'admin';
 
-  console.log("NEWROLE", newRole);
+  console.log('NEWROLE', newRole);
 
   const { data: updatedUser, error: updateError } = await supabase
     .from('users')

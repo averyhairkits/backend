@@ -6,7 +6,6 @@ const {
   userController,
 } = require('../controllers/apiController');
 
-
 // client request to volunteer on specific date and time
 router.post('/new_request', newRequestController);
 
