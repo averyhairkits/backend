@@ -1,7 +1,7 @@
 const express = require('express');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middleware/authMiddleware');
-const { grantAdminController } = require('../controllers/grantAdminController');
+const { updateRoleController } = require('../controllers/grantAdminController');
 const router = express.Router();
 
 router.post('/signup', authController.signup);
@@ -16,6 +16,6 @@ router.post('/callback', authController.handleToken);
 router.post('/reset-password', authController.requestPasswordReset);
 router.put('/reset-password', authController.updatePassword);
 router.get('/verify-recovery', authController.handlePasswordRecovery);
-router.post('/grant_admin', grantAdminController);
+router.post('/update_role', updateRoleController);
 
 module.exports = router;
