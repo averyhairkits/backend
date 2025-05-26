@@ -44,7 +44,9 @@ const findOverlappingHelper = async (start, end, res) => {
 
   const uniqueUserIds = Array.from(userMap.keys());
   const totalSize = Array.from(userMap.values()).reduce((sum, size) => sum + size, 0);
-
+  
+  console.log("find overlapping helper result of unique users: ", uniqueUserIds);
+  console.log("find overlapping helper result of totalsize: ", totalSize);
 
   return {
     uniqueUserIds,
@@ -108,7 +110,7 @@ const matchVolunteersController = async (req, res) => {
   }
 
   try {
-    // Convert 'YYYY-MM-DDTHH:MM:SS.SSSZ' to local 'YYYY-MM-DD HH:MM:SS'
+    // convert 'YYYY-MM-DDTHH:MM:SS.SSSZ' to local 'YYYY-MM-DD HH:MM:SS'
     const localStart = new Date(start);
     const localEnd = new Date(end);
 
@@ -116,17 +118,31 @@ const matchVolunteersController = async (req, res) => {
     const formattedEnd = formatLocalDateTimeForDB(localEnd);
 
     const { uniqueUserIds, totalSize } = await findOverlappingHelper(formattedStart, formattedEnd);
+
+
+    // fetch user details for each unique user: id, firstname, lastname, email
+    const { data: usersData, error: usersError } = await supabase
+      .from('users')
+      .select('id, firstname, lastname, email')
+      .in('id', uniqueUserIds);
+
+    if (usersError) {
+      console.error('Failed to fetch user info:', usersError.message);
+      return res.status(500).json({ error: 'Failed to fetch user info' });
+    }
+
     return res.status(200).json({ 
-      volunteers: uniqueUserIds,
-      current_size: totalSize
-     });
+      volunteers: usersData,
+      current_size: totalSize,
+    });
+
   } catch (err) {
     console.error('Error in matchVolunteersController:', err.message);
     return res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 };
 
-// Utility function to format Date as 'YYYY-MM-DD HH:MM:SS'
+// utility function to format Date as 'YYYY-MM-DD HH:MM:SS'
 const formatLocalDateTimeForDB = (date) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
