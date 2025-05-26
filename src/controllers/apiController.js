@@ -199,10 +199,6 @@ const getUserSlotsController = async (req, res) => {
       slotTotals[time] = (slotTotals[time] || 0) + slot.current_size;
     }
 
-    const overbookedSlots = Object.entries(slotTotals)
-      .filter(([_, total]) => total >= 6)
-      .map(([slot_time, total_size]) => ({ slot_time, total_size }));
-
     const grouped = {};
     for (const slot of data) {
       const weekStart = getWeekStartDate(new Date(slot.slot_time));
@@ -217,9 +213,6 @@ const getUserSlotsController = async (req, res) => {
 
     return res.status(200).json({
       weeks: groupedSlots,
-      summary: {
-        overbookedSlots,
-      },
     });
   } catch (err) {
     console.error('Unexpected error in getUserSlotsController:', err);
