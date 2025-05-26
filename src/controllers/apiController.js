@@ -1,45 +1,69 @@
 const supabase = require('../config/supabase');
 
+//handles new slot submissions from users
+/**
+ * POST /api/new_request
+ * Request: {
+ *   reqTimes: {
+ *    slot_time: timestamp of slot
+ *    request_size: integer
+ *    user_id: UUID
+ *  }
+ * }
+ * Response : {
+ *   message: string,
+ *   results: [{
+ *       timestamp: string,
+ *       status: "ok" | "error",
+ *       result?: { status: string, time: string },
+ *       error?: string
+ *     }]}
+ */
 const newRequestController = async (req, res) => {
-  const { reqTimeStampList, request_size, user_id } = req.body;
+  const { reqTimes } = req.body;
+    //iterate reqTimes, call helper on each
+    try {
+      const results = await Promise.all(
+        reqTimes.map(async ({ slot_time, request_size, user_id }) => {
+          try {
+            //call to helper function
+            const result = await newRequestHelper(slot_time, request_size, user_id);
+            return { timestamp: slot_time, status: 'ok', result };
+          } catch (err) {
+            return { timestamp: slot_time, status: 'error', error: err.message };
+          }
+        })
+      );
+      return res.status(200).json({
+        message: 'Processed all slot submissions',
+        results,
+      });
 
-  try {
-    const results = await Promise.all(
-      reqTimeStampList.map(async (timestamp) => {
-        try {
-          const result = await newRequestHelper(timestamp, request_size, user_id);
-          return { timestamp, status: 'ok', result };
-        } catch (err) {
-          return { timestamp, status: 'error', error: err.message };
-        }
-      })
-    );
-
-    return res.status(200).json({
-      message: 'Processed all slot submissions',
-      results,
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      error: 'Unexpected failure in processing slots',
-      details: error.message,
-    });
-  }
-};
+    } catch (error) {
+      return res.status(500).json({
+        error: 'Unexpected failure in processing slots',
+        details: error.message,
+      });
+    }
+  };
 
 
-
-//helper for processing new time slot submission from volunteer
-const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
+/**
+ * 
+ * helper for processing new time slot submission from volunteer
+ * handles new slot submissions from users
+ * 
+ */
+const newRequestHelper = async (reqTimeStamp, request_size, userid) => {
+  //extract date of reqTimeStamp
   const requestedDate = new Date(reqTimeStamp);
-
+  //calculate week start date of date
   const weekStart = getWeekStartDate(requestedDate);
 
   //reject if more than 3 weeks ahead from this week's Monday
   const today = new Date();
   const todayWeekStart = getWeekStartDate(today);
-  const maxDate = new Date(todayWeekStart);
+  const maxDate = new Date(todayWeekStart); //3 weeks ahead
   maxDate.setDate(maxDate.getDate() + 21);
 
   if (requestedDate > maxDate) {
@@ -51,20 +75,21 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
     .from('slots')
     .select('*')
     .eq('slot_time', reqTimeStamp);
-
   if (searchError) throw new Error(searchError.message);
 
+  //if no pre-existing matching slot from any user
   if (data.length === 0) {
+    //create new slot
     const newRequest = {
       created_at: new Date().toISOString(),
       slot_time: new Date(reqTimeStamp).toISOString(),
       week_start_date: weekStart.toISOString().split('T')[0],
       current_size: request_size,
-      status: 'waiting',
       user_id: userid,
     };
 
-    const { data: slotReturnInfo, error: createRequestError } = await supabase
+    //send new slot
+    const { error: createRequestError } = await supabase
       .from('slots')
       .insert([newRequest]);
 
@@ -74,28 +99,52 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid, res) => {
     return { status: 'inserted', time: reqTimeStamp };
   }
 
-  const existing = data[0];
+  //check if user already has a slot for this time
+  const existingUserSlot = data.find((slot) => slot.user_id === userid);
+  const otherSlots = data.filter((slot) => slot.user_id !== userid);
 
-  if (existing.status === 'rejected') {
-    throw new Error(`Slot ${reqTimeStamp} is unavailable.`);
-  }
+  //calculate current total from others
+  const otherTotalSize = otherSlots.reduce((sum, slot) => sum + slot.current_size, 0);
 
-  if (existing.current_size + request_size > 6) {
+  //total size if we add this request
+  const proposedTotal = otherTotalSize + request_size;
+
+  if (proposedTotal > 6) {
     throw new Error(`Slot ${reqTimeStamp} exceeds max volunteers.`);
   }
 
-  const { error: updateError } = await supabase
+  //if the user has an existing slot, update it
+  if (existingUserSlot) {
+    const { error: updateError } = await supabase
+      .from('slots')
+      .update({ current_size: request_size }) // replace old value
+      .match({ slot_time: reqTimeStamp, user_id: userid });
+
+    if (updateError) throw new Error(updateError.message);
+
+    return { status: 'updated', time: reqTimeStamp };
+  }
+
+  //else, add a new row for this user
+  const newRequest = {
+    created_at: new Date().toISOString(),
+    slot_time: new Date(reqTimeStamp).toISOString(),
+    week_start_date: weekStart.toISOString().split('T')[0],
+    current_size: request_size,
+    user_id: userid,
+  };
+
+  const { error: createError } = await supabase
     .from('slots')
-    .update({ current_size: existing.current_size + request_size })
-    .match({ slot_time: reqTimeStamp });
+    .insert([newRequest]);
 
-  if (updateError) throw new Error(updateError.message);
+  if (createError) throw new Error(createError.message);
 
-  return { status: 'updated', time: reqTimeStamp };
-};
+  return { status: 'inserted', time: reqTimeStamp };
+}
 
 
-// Helper function to calculate Monday of the current week and the next 3 weeks
+// helper function to calculate Monday of the current week and the next 3 weeks
 const getWeekStartDate = (date) => {
   const dayOfWeek = date.getDay();
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -103,61 +152,6 @@ const getWeekStartDate = (date) => {
   monday.setDate(monday.getDate() + diffToMonday);
   monday.setHours(0, 0, 0, 0);
   return monday;
-};
-
-
-// Helper function to get the next 3 weeks' slots
-const getSlotsController = async (req, res) => {
-  try {
-    // Get the current date
-    const currentDate = new Date();
-
-    // Get the week_start_date for the current week (Monday of this week)
-    const currentWeekStart = getWeekStartDate(currentDate);
-
-    // Calculate the next 3 weeks' start dates (Mondays)
-    let weekStartDates = [currentWeekStart];
-    for (let i = 1; i <= 3; i++) {
-      let nextWeekStart = new Date(currentWeekStart);
-      // Add 7 days for the next Monday
-      nextWeekStart.setDate(currentWeekStart.getDate() + i * 7);
-      weekStartDates.push(nextWeekStart);
-    }
-
-    // Format the week start dates as 'yyyy-mm-dd'
-    weekStartDates = weekStartDates.map(
-      (date) => date.toISOString().split('T')[0]
-    );
-
-    // Fetch all slots for the next 4 weeks
-    const { data: slots, error } = await supabase
-      .from('slots')
-      .select('*')
-      .in('week_start_date', weekStartDates) // Filter by the week_start_date
-      .order('week_start_date', { ascending: true }); // Sort by week_start_date
-
-    if (error) {
-      return res
-        .status(500)
-        .json({ error: 'Failed to fetch slotss', details: error });
-    }
-
-    // Organize the slots into weeks based on week_start_date
-    const groupedSlots = weekStartDates.map((date) => {
-      return {
-        week_start_date: date,
-        slots: slots.filter((slot) => slot.week_start_date === date),
-      };
-    });
-
-    // Return the structured JSON with the slots grouped by week_start_date
-    res.json({ 
-      weeks: groupedSlots, 
-    });
-  } catch (error) {
-    console.error('Error fetching slots:', error);
-    res.status(500).json({ error: 'Failed to fetch slots' });
-  }
 };
 
 
@@ -235,7 +229,6 @@ const getUserSlotsController = async (req, res) => {
 
 module.exports = {
   newRequestController,
-  getSlotsController,
   getUserSlotsController,
   userController
 };

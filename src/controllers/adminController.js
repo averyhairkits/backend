@@ -159,20 +159,22 @@ const cancelRequestController = async (req, res) => {
 };
 
 
-//gets all sessions matching a certain user_id
+/**
+ * 
+ * gets all sessions across all admins
+ * GET /admin/get_slots
+ * Request: -
+ * Response : {
+ *   weeks: groupedSlots 
+ * }
+ */
 const getSessionsController = async (req, res) => {
-  //check for user_id in query
-  const { user_id } = req.query; 
-  if (!user_id) {
-    return res.status(400).json({ error: 'Missing user_id in query' });
-  }
 
   try {
-    //search for slots matching user_id in order of slot_time
+    //search for slots in order of slot_time
     const { data, error } = await supabase
       .from('sessions')
       .select('*')
-      .eq('created_by', user_id)
       .order('start', { ascending: true });
     if (error) {
       return res.status(500).json({ error: 'Failed to fetch sessions', details: error.message });
@@ -187,9 +189,83 @@ const getSessionsController = async (req, res) => {
   };
 }
 
+
+//get all slots for all users
+/**
+ * GET /admin/get_slots
+ * Request: -
+ * Response : {
+ *   weeks: groupedSlots 
+ * }
+ */
+const getSlotsController = async (req, res) => {
+  try {
+    // get the current date
+    const currentDate = new Date();
+
+    // get the week_start_date for the current week (Monday of this week)
+    const currentWeekStart = getWeekStartDate(currentDate);
+
+    // calculate the next 3 weeks' start dates (Mondays)
+    let weekStartDates = [currentWeekStart];
+    for (let i = 1; i <= 3; i++) {
+      let nextWeekStart = new Date(currentWeekStart);
+      // add 7 days for the next Monday
+      nextWeekStart.setDate(currentWeekStart.getDate() + i * 7);
+      weekStartDates.push(nextWeekStart);
+    }
+
+    // format the week start dates as 'yyyy-mm-dd'
+    weekStartDates = weekStartDates.map(
+      (date) => date.toISOString().split('T')[0]
+    );
+
+    // fetch all slots for the next 4 weeks
+    const { data: slots, error } = await supabase
+      .from('slots')
+      .select('*')
+      .in('week_start_date', weekStartDates) // filter by the week_start_date
+      .order('week_start_date', { ascending: true }); // sort by week_start_date
+
+    if (error) {
+      return res
+        .status(500)
+        .json({ error: 'Failed to fetch slotss', details: error });
+    }
+
+    // organize the slots into weeks based on week_start_date
+    const groupedSlots = weekStartDates.map((date) => {
+      return {
+        week_start_date: date,
+        slots: slots.filter((slot) => slot.week_start_date === date),
+      };
+    });
+
+    // return the structured JSON with the slots grouped by week_start_date
+    res.json({ 
+      weeks: groupedSlots, 
+    });
+  } catch (error) {
+    console.error('Error fetching slots:', error);
+    res.status(500).json({ error: 'Failed to fetch slots' });
+  }
+};
+
+// helper function to calculate Monday of the current week and the next 3 weeks
+const getWeekStartDate = (date) => {
+  const dayOfWeek = date.getDay();
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(date);
+  monday.setDate(monday.getDate() + diffToMonday);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+};
+
+
 module.exports = { 
   approveRequestController,
   cancelRequestController,
   getSessionsController,
+  getSlotsController,
   matchVolunteersController
 };
