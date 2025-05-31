@@ -208,7 +208,47 @@ const getUserSlotsController = async (req, res) => {
   }
 };
 
+//handles fetching all session data for a certain user
+const getUserSessionsController = async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing user_id in request query',
+      });
+    }
+    const { data, error } = await supabase
+      .from('session_volunteers')
+      .select('sessions!inner(*)')
+      .eq('sessions.status', 'confirmed')
+      .eq('volunteer_id', user_id);
+
+    if (error) {
+      console.error('Supabase Error:', error);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Failed to fetch user sessions',
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      status: 'ok',
+      sessions: data,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch user sessions',
+      error: err.message,
+    });
+  }
+};
+
 module.exports = {
   newRequestController,
   getUserSlotsController,
+  getUserSessionsController,
 };

@@ -8,26 +8,45 @@ const approveRequestController = async (req, res) => {
     return res.status(400).json({ error: 'Missing start or end time' });
   }
   //map of attending volunteer's ids
-  const { uniqueUserIds, totalSize } = await findOverlappingHelper(
+  const { uniqueUserIds, totalSize } = await findOverlappingHelper(start, end);
+
+  const insertedSessionId = await insertSessionHelper({
+    title,
+    description,
     start,
     end,
-    res
-  );
+    created_by,
+    volunteer_count: totalSize,
+  });
 
-  const insertedSessionId = await insertSessionHelper(
-    { title, description, start, end, created_by },
-    res
-  );
+  await linkVolunteersHelper(insertedSessionId, uniqueUserIds);
 
-  await linkVolunteersHelper(insertedSessionId, uniqueUserIds, res);
+  // fetch user details
+  const { data: userDetails, error: userFetchError } = await supabase
+    .from('users')
+    .select('id, firstname, lastname, email')
+    .in('id', uniqueUserIds);
+
+  if (userFetchError) {
+    console.error('Failed to fetch user details:', userFetchError.message);
+  }
 
   return res.status(200).json({
     message: 'Session created and volunteers linked',
-    session: insertedSessionId,
+    session: {
+      id: insertedSessionId,
+      title,
+      description,
+      start,
+      end,
+      created_by,
+      current_size: totalSize,
+      volunteers: userDetails || [],
+    },
   });
 };
 
-const findOverlappingHelper = async (start, end, res) => {
+const findOverlappingHelper = async (start, end) => {
   //find volunteer slots overlapping with the session time
   const { data: overlappingSlotsData, error: slotError } = await supabase
     .from('slots')
@@ -48,7 +67,7 @@ const findOverlappingHelper = async (start, end, res) => {
   }
 
   const uniqueUserIds = Array.from(userMap.keys());
-  
+
   const totalSize = Array.from(userMap.values()).reduce(
     (sum, size) => sum + size,
     0
@@ -66,10 +85,14 @@ const findOverlappingHelper = async (start, end, res) => {
   };
 };
 
-const insertSessionHelper = async (
-  { title, description, start, end, created_by },
-  res
-) => {
+const insertSessionHelper = async ({
+  title,
+  description,
+  start,
+  end,
+  created_by,
+  volunteer_count,
+}) => {
   const { data: sessionInsertData, error: sessionError } = await supabase
     .from('sessions')
     .insert([
@@ -80,6 +103,7 @@ const insertSessionHelper = async (
         end: end,
         status: 'confirmed',
         created_by: created_by,
+        volunteer_count: volunteer_count,
       },
     ])
     .select()
@@ -96,7 +120,7 @@ const insertSessionHelper = async (
   return sessionId;
 };
 
-const linkVolunteersHelper = async (sessionId, userIds, res) => {
+const linkVolunteersHelper = async (sessionId, userIds) => {
   //link volunteers to session
   const volunteerLinks = userIds.map((userId) => ({
     session_id: sessionId,
@@ -193,21 +217,43 @@ const cancelRequestController = async (req, res) => {
  *   weeks: groupedSlots
  * }
  */
+// /admin/get_sessions
 const getSessionsController = async (req, res) => {
   try {
-    //search for slots in order of slot_time
     const { data, error } = await supabase
       .from('sessions')
-      .select('*')
+      .select(
+        `
+        *,
+        session_volunteers (
+          volunteer_id,
+          users (
+            id,
+            email,
+            firstname,
+            lastname
+          )
+        )
+      `
+      )
+      .eq('status', 'confirmed')
       .order('start', { ascending: true });
+
     if (error) {
-      return res
-        .status(500)
-        .json({ error: 'Failed to fetch sessions', details: error.message });
+      return res.status(500).json({
+        error: 'Failed to fetch sessions',
+        details: error.message,
+      });
     }
 
+    // flatten the volunteer info for frontend
+    const enriched = data.map((session) => ({
+      ...session,
+      volunteers: session.session_volunteers.map((link) => link.users),
+    }));
+
     return res.status(200).json({
-      sessions: data,
+      sessions: enriched,
     });
   } catch (err) {
     console.error('Unexpected error in getSessionsController:', err);
