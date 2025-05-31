@@ -8,18 +8,18 @@ const approveRequestController = async (req, res) => {
     return res.status(400).json({ error: 'Missing start or end time' });
   }
   //map of attending volunteer's ids
-  const { uniqueUserIds, totalSize } = await findOverlappingHelper(
+  const { uniqueUserIds, totalSize } = await findOverlappingHelper(start, end);
+
+  const insertedSessionId = await insertSessionHelper({
+    title,
+    description,
     start,
     end,
-    res
-  );
+    created_by,
+    volunteer_count: totalSize,
+  });
 
-  const insertedSessionId = await insertSessionHelper(
-  { title, description, start, end, created_by, volunteer_count: totalSize },
-  res
-);
-
-  await linkVolunteersHelper(insertedSessionId, uniqueUserIds, res);
+  await linkVolunteersHelper(insertedSessionId, uniqueUserIds);
 
   // fetch user details
   const { data: userDetails, error: userFetchError } = await supabase
@@ -32,21 +32,21 @@ const approveRequestController = async (req, res) => {
   }
 
   return res.status(200).json({
-  message: 'Session created and volunteers linked',
-  session: {
-    id: insertedSessionId,
-    title,
-    description,
-    start,
-    end,
-    created_by,
-    current_size: totalSize,
-    volunteers: userDetails || [],
-  },
-});
+    message: 'Session created and volunteers linked',
+    session: {
+      id: insertedSessionId,
+      title,
+      description,
+      start,
+      end,
+      created_by,
+      current_size: totalSize,
+      volunteers: userDetails || [],
+    },
+  });
 };
 
-const findOverlappingHelper = async (start, end, res) => {
+const findOverlappingHelper = async (start, end) => {
   //find volunteer slots overlapping with the session time
   const { data: overlappingSlotsData, error: slotError } = await supabase
     .from('slots')
@@ -67,7 +67,7 @@ const findOverlappingHelper = async (start, end, res) => {
   }
 
   const uniqueUserIds = Array.from(userMap.keys());
-  
+
   const totalSize = Array.from(userMap.values()).reduce(
     (sum, size) => sum + size,
     0
@@ -85,10 +85,14 @@ const findOverlappingHelper = async (start, end, res) => {
   };
 };
 
-const insertSessionHelper = async (
-  { title, description, start, end, created_by, volunteer_count },
-  res
-) => {
+const insertSessionHelper = async ({
+  title,
+  description,
+  start,
+  end,
+  created_by,
+  volunteer_count,
+}) => {
   const { data: sessionInsertData, error: sessionError } = await supabase
     .from('sessions')
     .insert([
@@ -116,7 +120,7 @@ const insertSessionHelper = async (
   return sessionId;
 };
 
-const linkVolunteersHelper = async (sessionId, userIds, res) => {
+const linkVolunteersHelper = async (sessionId, userIds) => {
   //link volunteers to session
   const volunteerLinks = userIds.map((userId) => ({
     session_id: sessionId,
@@ -218,7 +222,8 @@ const getSessionsController = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('sessions')
-      .select(`
+      .select(
+        `
         *,
         session_volunteers (
           volunteer_id,
@@ -229,7 +234,8 @@ const getSessionsController = async (req, res) => {
             lastname
           )
         )
-      `)
+      `
+      )
       .eq('status', 'confirmed')
       .order('start', { ascending: true });
 
@@ -254,7 +260,6 @@ const getSessionsController = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
-
 
 //get all slots for all users
 /**
