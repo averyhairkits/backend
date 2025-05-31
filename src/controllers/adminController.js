@@ -213,27 +213,48 @@ const cancelRequestController = async (req, res) => {
  *   weeks: groupedSlots
  * }
  */
+// /admin/get_sessions
 const getSessionsController = async (req, res) => {
   try {
-    //search for slots in order of slot_time
     const { data, error } = await supabase
       .from('sessions')
-      .select('*')
+      .select(`
+        *,
+        session_volunteers (
+          volunteer_id,
+          users (
+            id,
+            email,
+            firstname,
+            lastname
+          )
+        )
+      `)
+      .eq('status', 'confirmed')
       .order('start', { ascending: true });
+
     if (error) {
-      return res
-        .status(500)
-        .json({ error: 'Failed to fetch sessions', details: error.message });
+      return res.status(500).json({
+        error: 'Failed to fetch sessions',
+        details: error.message,
+      });
     }
 
+    // flatten the volunteer info for frontend
+    const enriched = data.map((session) => ({
+      ...session,
+      volunteers: session.session_volunteers.map((link) => link.users),
+    }));
+
     return res.status(200).json({
-      sessions: data,
+      sessions: enriched,
     });
   } catch (err) {
     console.error('Unexpected error in getSessionsController:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 //get all slots for all users
 /**
