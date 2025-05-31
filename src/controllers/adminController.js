@@ -15,16 +15,35 @@ const approveRequestController = async (req, res) => {
   );
 
   const insertedSessionId = await insertSessionHelper(
-    { title, description, start, end, created_by },
-    res
-  );
+  { title, description, start, end, created_by, volunteer_count: totalSize },
+  res
+);
 
   await linkVolunteersHelper(insertedSessionId, uniqueUserIds, res);
 
+  // fetch user details
+  const { data: userDetails, error: userFetchError } = await supabase
+    .from('users')
+    .select('id, firstname, lastname, email')
+    .in('id', uniqueUserIds);
+
+  if (userFetchError) {
+    console.error('Failed to fetch user details:', userFetchError.message);
+  }
+
   return res.status(200).json({
-    message: 'Session created and volunteers linked',
-    session: insertedSessionId,
-  });
+  message: 'Session created and volunteers linked',
+  session: {
+    id: insertedSessionId,
+    title,
+    description,
+    start,
+    end,
+    created_by,
+    current_size: totalSize,
+    volunteers: userDetails || [],
+  },
+});
 };
 
 const findOverlappingHelper = async (start, end, res) => {
@@ -67,7 +86,7 @@ const findOverlappingHelper = async (start, end, res) => {
 };
 
 const insertSessionHelper = async (
-  { title, description, start, end, created_by },
+  { title, description, start, end, created_by, volunteer_count },
   res
 ) => {
   const { data: sessionInsertData, error: sessionError } = await supabase
@@ -80,6 +99,7 @@ const insertSessionHelper = async (
         end: end,
         status: 'confirmed',
         created_by: created_by,
+        volunteer_count: volunteer_count,
       },
     ])
     .select()
