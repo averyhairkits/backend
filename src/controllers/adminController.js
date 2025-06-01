@@ -145,12 +145,14 @@ const matchVolunteersController = async (req, res) => {
   }
 
   try {
-    // convert 'YYYY-MM-DDTHH:MM:SS.SSSZ' to local 'YYYY-MM-DD HH:MM:SS'
     const localStart = new Date(start);
     const localEnd = new Date(end);
 
-    const formattedStart = formatLocalDateTimeForDB(localStart);
+    const formattedStart = formatLocalDateTimeForDB(localStart); // ← forces it to 'YYYY-MM-DD HH:MM:SS' using local time
     const formattedEnd = formatLocalDateTimeForDB(localEnd);
+
+
+    console.log('match volunteer scontroller - formattedStart:', formattedStart, 'formattedEnd:', formattedEnd);
 
     const { uniqueUserIds, totalSize } = await findOverlappingHelper(
       formattedStart,

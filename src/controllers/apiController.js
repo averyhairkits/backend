@@ -50,6 +50,8 @@ const newRequestController = async (req, res) => {
   }
 };
 
+
+
 /**
  *
  * helper for processing new time slot submission from volunteer
@@ -101,6 +103,8 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid) => {
     return { status: 'inserted', time: reqTimeStamp };
   }
 
+
+
   //check if user already has a slot for this time
   const existingUserSlot = data.find((slot) => slot.user_id === userid);
   const otherSlots = data.filter((slot) => slot.user_id !== userid);
@@ -148,6 +152,7 @@ const newRequestHelper = async (reqTimeStamp, request_size, userid) => {
   return { status: 'inserted', time: reqTimeStamp };
 };
 
+
 // helper function to calculate Monday of the current week and the next 3 weeks
 const getWeekStartDate = (date) => {
   const dayOfWeek = date.getDay();
@@ -157,6 +162,9 @@ const getWeekStartDate = (date) => {
   monday.setHours(0, 0, 0, 0);
   return monday;
 };
+
+
+
 
 //gets all slots matching a certain user_id
 const getUserSlotsController = async (req, res) => {
@@ -208,6 +216,7 @@ const getUserSlotsController = async (req, res) => {
   }
 };
 
+
 //handles fetching all session data for a certain user
 const getUserSessionsController = async (req, res) => {
   try {
@@ -215,11 +224,10 @@ const getUserSessionsController = async (req, res) => {
 
     if (!user_id) {
       return res.status(400).json({
-        status: 'error',
-        message: 'Missing user_id in request query',
-      });
+          status: 'error',
+          message: 'Missing user_id in request query'});
     }
-    const { data, error } = await supabase
+    const {data, error} = await supabase
       .from('session_volunteers')
       .select('sessions!inner(*)')
       .eq('sessions.status', 'confirmed')
@@ -228,22 +236,22 @@ const getUserSessionsController = async (req, res) => {
     if (error) {
       console.error('Supabase Error:', error);
       return res.status(500).json({
-        status: 'error',
-        message: 'Failed to fetch user sessions',
-        error: error.message,
-      });
-    }
-
+          status: 'error',
+          message: 'Failed to fetch user sessions', 
+          error: error.message,
+        })}
+    
     return res.status(200).json({
       status: 'ok',
       sessions: data,
     });
-  } catch (err) {
+  }
+  catch(err) {
     return res.status(500).json({
       status: 'error',
       message: 'Failed to fetch user sessions',
       error: err.message,
-    });
+    })
   }
 };
 
