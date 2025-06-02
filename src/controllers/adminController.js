@@ -19,7 +19,11 @@ const approveRequestController = async (req, res) => {
     volunteer_count: totalSize,
   });
 
-  await linkVolunteersHelper(insertedSessionId, uniqueUserIds);
+  try {
+    await linkVolunteersHelper(insertedSessionId, uniqueUserIds);
+  } catch (err) {
+    console.error('Linking volunteers failed:', err.message);
+  }
 
   // fetch user details
   const { data: userDetails, error: userFetchError } = await supabase
@@ -132,9 +136,11 @@ const linkVolunteersHelper = async (sessionId, userIds) => {
     .insert(volunteerLinks);
 
   if (linkError) {
-    throw new Error('Failed to link volunteers', linkError.message);
+    console.error('Supabase insert failed:', linkError);
+    throw new Error(`Failed to link volunteers: ${linkError.message}`);
   }
-  console.log('succeeded');
+  console.log('🚨 INSERTING into session_volunteers:', volunteerLinks);
+
 };
 
 const matchVolunteersController = async (req, res) => {
