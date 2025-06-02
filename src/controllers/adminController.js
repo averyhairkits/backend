@@ -226,7 +226,7 @@ const getSessionsController = async (req, res) => {
       .from('sessions')
       .select(
         `
-        *,
+        id, title, description, start, end, status, created_by, volunteer_count,
         session_volunteers (
           volunteer_id,
           users (
@@ -251,8 +251,11 @@ const getSessionsController = async (req, res) => {
     // flatten the volunteer info for frontend
     const enriched = data.map((session) => ({
       ...session,
+      current_size: session.volunteer_count || 0,
       volunteers: session.session_volunteers.map((link) => link.users),
     }));
+
+    console.log('Sessions fetched from Supabase:', JSON.stringify(data, null, 2));
 
     return res.status(200).json({
       sessions: enriched,
