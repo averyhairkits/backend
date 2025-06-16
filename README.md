@@ -1,8 +1,9 @@
-# Backend Template
+# Avery’s Helpful Hair Kits Scheduling Portal - BACKEND
 
-_2025 Discover Program Project Templates_
+This web app helps Avery’s Helpful Hair Kits streamline volunteer session sign-ups and admin session management. Built during the 2025 Discover Program at Northwestern.
 
-This template was created by the DISC tech leads of 2024-2025:
+
+Based on a template created by the DISC tech leads of 2024-2025:
 
 - [Amy Liao](https://www.linkedin.com/in/amyzliao/)
 - [Ethan Pineda](https://www.linkedin.com/in/ethanpineda/)
@@ -45,7 +46,21 @@ Here's how to set that up:
 
 Find more details about our linting config [here](#code-formatting-rules)
 
-### 3. Run the server in development mode
+### 3. Environment Variables for Local Development
+Create a `.env` file in the root directory with the following:
+
+```env
+SUPABASE_URL=https://kimoiljkzrqiscjtzlwv.supabase.co/
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpbW9pbGprenJxaXNjanR6bHd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDgwOTAsImV4cCI6MjA1NjYyNDA5MH0.TwPXNkuZu3VX6m6JLSlBPVdKj7TH0RnxxaHd0Zcg1Qw
+PORT=5050
+FRONTEND_URL=http://localhost:3001
+API_URL=http://localhost:5050/
+FRONTEND_URL_DEV=http://localhost:3001
+NODE_ENV=development
+
+```
+
+### 4. Run the server in development mode
 
 ```
 npm run dev
